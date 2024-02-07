@@ -132,7 +132,7 @@ impl WindowPortsMethods for Window {
         self.animation_state.get() == AnimationState::Animating
     }
 
-    fn queue_embedder_events_for_winit_event(&self, _event: winit::event::WindowEvent<'_>) {
+    fn queue_embedder_events_for_winit_event(&self, _event: winit::event::WindowEvent) {
         // Not expecting any winit events.
     }
 

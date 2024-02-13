@@ -945,9 +945,9 @@ class CommandBase(object):
             self.cross_compile_target not in \
             check_output(["rustup", "target", "list", "--installed"],
                          cwd=self.context.topdir).decode()
-        if needs_toolchain_install:
-            check_call(["rustup", "target", "add", self.cross_compile_target],
-                       cwd=self.context.topdir)
+#         if needs_toolchain_install:
+#             check_call(["rustup", "target", "add", self.cross_compile_target],
+#                        cwd=self.context.topdir)
 
         self.context.bootstrapped = True
 

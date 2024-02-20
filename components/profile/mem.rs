@@ -387,23 +387,25 @@ impl ReportsForest {
 //---------------------------------------------------------------------------
 
 mod system_reporter {
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_env = "ohos")))]
     use std::ffi::CString;
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_env = "ohos")))]
     use std::mem::size_of;
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_env = "ohos")))]
     use std::ptr::null_mut;
 
     #[cfg(target_os = "linux")]
     use libc::c_int;
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_env = "ohos")))]
     use libc::{c_void, size_t};
     use profile_traits::mem::{Report, ReportKind, ReporterRequest};
     use profile_traits::path;
     #[cfg(target_os = "macos")]
     use task_info::task_basic_info::{resident_size, virtual_size};
 
-    use super::{JEMALLOC_HEAP_ALLOCATED_STR, SYSTEM_HEAP_ALLOCATED_STR};
+    #[cfg(not(target_env = "ohos"))]
+    use super::JEMALLOC_HEAP_ALLOCATED_STR;
+    use super::SYSTEM_HEAP_ALLOCATED_STR;
 
     /// Collects global measurements from the OS and heap allocators.
     pub fn collect_reports(request: ReporterRequest) {
@@ -435,21 +437,24 @@ mod system_reporter {
             // The descriptions of the following jemalloc measurements are taken
             // directly from the jemalloc documentation.
 
-            // "Total number of bytes allocated by the application."
-            report(
-                path![JEMALLOC_HEAP_ALLOCATED_STR],
-                jemalloc_stat("stats.allocated"),
-            );
+            #[cfg(not(target_env = "ohos"))]
+            {
+                // "Total number of bytes allocated by the application."
+                report(
+                    path![JEMALLOC_HEAP_ALLOCATED_STR],
+                    jemalloc_stat("stats.allocated"),
+                );
 
-            // "Total number of bytes in active pages allocated by the application.
-            // This is a multiple of the page size, and greater than or equal to
-            // |stats.allocated|."
-            report(path!["jemalloc-heap-active"], jemalloc_stat("stats.active"));
+                // "Total number of bytes in active pages allocated by the application.
+                // This is a multiple of the page size, and greater than or equal to
+                // |stats.allocated|."
+                report(path!["jemalloc-heap-active"], jemalloc_stat("stats.active"));
 
-            // "Total number of bytes in chunks mapped on behalf of the application.
-            // This is a multiple of the chunk size, and is at least as large as
-            // |stats.active|. This does not include inactive chunks."
-            report(path!["jemalloc-heap-mapped"], jemalloc_stat("stats.mapped"));
+                // "Total number of bytes in chunks mapped on behalf of the application.
+                // This is a multiple of the chunk size, and is at least as large as
+                // |stats.active|. This does not include inactive chunks."
+                report(path!["jemalloc-heap-mapped"], jemalloc_stat("stats.mapped"));
+            }
         }
 
         request.reports_channel.send(reports);
@@ -499,10 +504,10 @@ mod system_reporter {
         None
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_env = "ohos")))]
     use jemalloc_sys::mallctl;
 
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_env = "ohos")))]
     fn jemalloc_stat(value_name: &str) -> Option<usize> {
         // Before we request the measurement of interest, we first send an "epoch"
         // request. Without that jemalloc gives cached statistics(!) which can be

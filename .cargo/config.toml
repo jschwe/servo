@@ -28,10 +28,31 @@ linker = "lld-link.exe"
 [target.aarch64-uwp-windows-msvc]
 linker = "lld-link.exe"
 
+[target.aarch64-unknown-linux-ohos]
+ar = "/home/jschwender/tools/ohos-sdk/linux/native-linux-x64-4.0.10.13-Release/native/llvm/bin/llvm-ar"
+linker = "aarch64-unknown-linux-ohos-clang.sh"
+
+[unstable]
+build-std = ["core", "alloc", "std"]
+
 [env]
 MACOSX_DEPLOYMENT_TARGET = "10.10"
-RUSTC_BOOTSTRAP = "crown,script,style_tests"
+RUSTC_BOOTSTRAP = "1"
 
 [build]
 rustdocflags = ["--document-private-items"]
 rustc = "crown"
+
+[patch.crates-io]
+mozjs = { git = "ssh://git@rnd-gitlab-eu-c.huawei.com:2222/germany-research-center/dresden-lab/common/mirrors/mozjs.git", rev = "6bb4be2aef2e15c920b154b72d13ed5cabe7c02c" }
+socket2 = { git = "https://github.com/rust-lang/socket2.git" }
+# bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", rev="b7de6ee766fdb3b2f2acdba6e31cd7eea0a62bbb" }
+
+#[patch.'https://github.com/rust-lang/rust-bindgen.git']
+#bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", rev="b7de6ee766fdb3b2f2acdba6e31cd7eea0a62bbb" }
+
+[patch.'https://github.com/servo/webrender']
+webrender = { git = "ssh://git@rnd-gitlab-eu-c.huawei.com:2222/germany-research-center/dresden-lab/common/mirrors/webrender.git" }
+
+[patch.'https://github.com/servo/mozjs']
+mozjs = { git = "ssh://git@rnd-gitlab-eu-c.huawei.com:2222/germany-research-center/dresden-lab/common/mirrors/mozjs.git" }

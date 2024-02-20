@@ -28,10 +28,18 @@ linker = "lld-link.exe"
 [target.aarch64-uwp-windows-msvc]
 linker = "lld-link.exe"
 
+[target.aarch64-unknown-linux-ohos]
+ar = "/home/jschwender/tools/ohos-sdk/linux/native-linux-x64-4.0.10.13-Release/native/llvm/bin/llvm-ar"
+linker = "aarch64-unknown-linux-ohos-clang.sh"
+
+[unstable]
+build-std = ["core", "alloc", "std"]
+
 [env]
 MACOSX_DEPLOYMENT_TARGET = "10.10"
-RUSTC_BOOTSTRAP = "crown,script,style_tests"
+RUSTC_BOOTSTRAP = "1"
 
 [build]
 rustdocflags = ["--document-private-items"]
 rustc = "crown"
+

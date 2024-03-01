@@ -1,0 +1,46 @@
+[package]
+name = "simpleservo_napi"
+version = "0.0.1"
+authors = ["The Servo Project Developers"]
+license = "MPL-2.0"
+edition = "2018"
+publish = false
+build = "build.rs"
+
+[lib]
+name = "simpleservo"
+crate-type = ["cdylib"]
+test = false
+bench = false
+
+[dependencies]
+# Todo: Evaluate how official this crate is.
+ohos_hilog = "0.1.2"
+napi-derive-ohos = "0.0.9"
+napi-ohos = "0.1"
+getopts = { workspace = true }
+libc = { workspace = true }
+# libloading = "0.8"
+libservo = { path = "../../components/servo" }
+log = { workspace = true }
+serde_json = { workspace = true }
+servo-media = { git = "https://github.com/servo/media" }
+surfman = { workspace = true, features = ["sm-angle-default"] }
+webxr = { git = "https://github.com/servo/webxr" }
+backtrace = "0.3.71"
+
+[target.'cfg(all(target_os = "linux", target_env = "ohos"))'.dependencies]
+ohos_hilog = "0.1"
+ohos-sys = { git = "https://github.com/jschwe/ohos-sys.git" }
+ipc-channel = { workspace = true, features = ["force-inprocess"] }
+
+[build-dependencies]
+cc = "1.0"
+gl_generator = "0.14"
+serde_json = { workspace = true }
+vergen = { version = "8.0.0", features = ["git", "gitcl"] }
+
+[features]
+debugmozjs = ["libservo/debugmozjs"]
+default = ["max_log_level"]
+max_log_level = ["log/release_max_level_info", "log/max_level_info"]

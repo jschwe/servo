@@ -22,7 +22,7 @@
 
 fn main() {
     cfg_if::cfg_if! {
-        if #[cfg(not(target_os = "android"))] {
+        if #[cfg(not(any(target_os = "android", target_env = "ohos")))] {
             servoshell::main()
         } else {
             println!(

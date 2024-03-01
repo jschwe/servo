@@ -43,3 +43,5 @@ RUSTC_BOOTSTRAP = "1"
 rustdocflags = ["--document-private-items"]
 rustc = "crown"
 
+[patch.crates-io]
+surfman = { git = "https://github.com/jschwe/surfman", rev = "d69be471ee7e4d663a0b17339e71169334c0ea6e"}

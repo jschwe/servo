@@ -1,0 +1,25 @@
+[package]
+name = "simpleservo_napi"
+version = "0.0.1"
+authors = ["The Servo Project Developers"]
+license = "MPL-2.0"
+edition = "2018"
+publish = false
+build = "build.rs"
+
+[lib]
+name = "simpleservo"
+crate-type = ["cdylib"]
+test = false
+bench = false
+
+[dependencies]
+libservo = { path = "../../components/servo" }
+libc = { workspace = true }
+log = { workspace = true }
+
+[build-dependencies]
+cc = "1.0"
+gl_generator = "0.14"
+serde_json = { workspace = true }
+vergen = { version = "8.0.0", features = ["git", "gitcl"] }

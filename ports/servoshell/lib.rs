@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 // For Android, see /support/android/apk/ + /ports/jniapi/.
-#![cfg(not(target_os = "android"))]
+#![cfg(not(any(target_os = "android", target_env = "ohos")))]
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[macro_use]

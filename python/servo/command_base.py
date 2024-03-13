@@ -253,6 +253,7 @@ class CommandBase(object):
         self.features = []
         self.cross_compile_target = None
         self.is_android_build = False
+        self.is_ohos_build = False
         self.target_path = util.get_target_dir()
 
         def get_env_bool(var, default):
@@ -795,6 +796,7 @@ class CommandBase(object):
 
         self.cross_compile_target = cross_compile_target
         self.is_android_build = (cross_compile_target and "android" in cross_compile_target)
+        self.is_ohos_build = (cross_compile_target and "ohos" in cross_compile_target)
         self.target_path = servo.util.get_target_dir()
         if self.is_android_build:
             assert self.cross_compile_target
@@ -850,6 +852,8 @@ class CommandBase(object):
         if "--manifest-path" not in cargo_args:
             if self.is_android_build:
                 port = "jniapi"
+            elif self.is_ohos_build:
+                port = "ohos_simpleservo"
             else:
                 port = "servoshell"
             args += [

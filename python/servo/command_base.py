@@ -10,6 +10,9 @@
 from __future__ import annotations
 
 import contextlib
+import errno
+import json
+import pathlib
 from enum import Enum
 from typing import Dict, List, Optional
 import functools
@@ -32,6 +35,7 @@ from glob import glob
 from os import path
 from subprocess import PIPE
 from xml.etree.ElementTree import XML
+from packaging.version import parse as parse_version
 
 import toml
 
@@ -253,6 +257,7 @@ class CommandBase(object):
         self.features = []
         self.cross_compile_target = None
         self.is_android_build = False
+        self.is_ohos_build = False
         self.target_path = util.get_target_dir()
 
         def get_env_bool(var, default):
@@ -338,6 +343,9 @@ class CommandBase(object):
             return path.join(base_path, build_type.directory_name(), "libsimpleservo.so")
         elif target:
             base_path = path.join(base_path, target)
+
+        if "-ohos" in target:
+            return path.join(base_path, build_type.directory_name(), "libsimpleservo.so")
 
         binary_name = f"servo{servo.platform.get().executable_suffix()}"
         binary_path = path.join(base_path, build_type.directory_name(), binary_name)
@@ -513,6 +521,7 @@ class CommandBase(object):
         env['RUSTFLAGS'] = " ".join(env['RUSTFLAGS'].split())
 
         self.build_android_env_if_needed(env)
+        self.build_ohos_env_if_needed(env)
 
         return env
 
@@ -646,6 +655,128 @@ class CommandBase(object):
             os.makedirs(env['AAR_OUT_DIR'])
 
         env['PKG_CONFIG_SYSROOT_DIR'] = path.join(llvm_toolchain, 'sysroot')
+
+    def build_ohos_env_if_needed(self, env: Dict[str, str]):
+        if not self.is_ohos_build:
+            return
+
+        # Paths to OpenHarmony SDK and build tools:
+        try:
+            if self.config["ohos"]["ndk"]:
+                env["OHOS_SDK_NATIVE"] = self.config["ohos"]["ndk"]
+        except KeyError:
+            pass
+
+        if "OHOS_SDK_NATIVE" not in env:
+            print("Please set the OHOS_SDK_NATIVE environment variable to the location of the `native` directory "
+                  "in the OpenHarmony SDK.")
+            sys.exit(1)
+
+        ndk_root = pathlib.Path(env["OHOS_SDK_NATIVE"])
+
+        if not ndk_root.is_dir():
+            print(f"OHOS_SDK_NATIVE is not set to a valid directory: `{ndk_root}`")
+            sys.exit(1)
+
+        ndk_root = ndk_root.resolve()
+
+        package_info = ndk_root.joinpath("oh-uni-package.json")
+        try:
+            with open(package_info) as meta_file:
+                meta = json.load(meta_file)
+            ohos_api_version = int(meta['apiVersion'])
+            ohos_sdk_version = parse_version(meta['version'])
+            if ohos_sdk_version < parse_version('4.0'):
+                print("Warning: mach build currently assumes at least the OpenHarmony 4.0 SDK is used.")
+            print(f"Info: The OpenHarmony SDK {ohos_sdk_version} is targeting API-level {ohos_api_version}")
+        except Exception as e:
+            print(f"Failed to read metadata information from {package_info}")
+            print(f"Exception: {e}")
+
+        # The OS SDK provides a bash-script clang wrapper, which is used to invoke the compiler
+        # and the linker. This doesn't really work on windows, since even if e.g. the git-bash
+        # shell is used, the build-systems which later invoke the compiler(-wrapper) assume it is
+        # a valid win32 application. This can be worked around, but for now we just don't support it.
+        os_type = platform.system().lower()
+        if os_type not in ["linux", "darwin"]:
+            raise Exception("OpenHarmony cross builds are currently only supported on Linux and macOS.")
+
+        llvm_toolchain = ndk_root.joinpath("llvm")
+        llvm_bin = llvm_toolchain.joinpath("bin")
+        ohos_sysroot = ndk_root.joinpath("sysroot")
+        if not (llvm_toolchain.is_dir() and llvm_bin.is_dir()):
+            print(f"Expected to find `llvm` and `llvm/bin` folder under $OHOS_SDK_NATIVE at `{llvm_toolchain}`")
+            sys.exit(1)
+        if not ohos_sysroot.is_dir():
+            print(f"Could not find OpenHarmony sysroot in {ndk_root}")
+            sys.exit(1)
+
+        env['PATH'] = str(llvm_bin) + ':' + env['PATH']
+
+        def to_sdk_llvm_bin(prog: str):
+            if is_windows():
+                prog = prog + '.exe'
+            llvm_prog = llvm_bin.joinpath(prog)
+            if not llvm_prog.is_file():
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), llvm_prog)
+            return str(llvm_bin.joinpath(prog))
+
+
+        # CC and CXX should already be set to appropriate host compilers by `build_env()`
+        env['HOST_CC'] = env['CC']
+        env['HOST_CXX'] = env['CXX']
+        env['TARGET_AR'] = to_sdk_llvm_bin("llvm-ar")
+        env['TARGET_RANLIB'] = to_sdk_llvm_bin("llvm-ranlib")
+        env['TARGET_OBJCOPY'] = to_sdk_llvm_bin("llvm-objcopy")
+        env['TARGET_STRIP'] = to_sdk_llvm_bin("llvm-strip")
+
+        # Todo: mozjs build script should be adjusted to respect the same flag variants as cc-rs
+        env['AR'] = to_sdk_llvm_bin("llvm-ar")
+
+        rust_target_triple = str(self.cross_compile_target).replace('-', '_')
+        assert rust_target_triple.endswith('_ohos')
+        ndk_clang = to_sdk_llvm_bin("clang")
+        ndk_clangxx = to_sdk_llvm_bin("clang++")
+        env[f'CC_{rust_target_triple}'] = ndk_clang
+        env[f'CXX_{rust_target_triple}'] = ndk_clangxx
+        # The clang target name is different from the LLVM target name
+        clang_target_triple = str(self.cross_compile_target).replace('-unknown-', '-')
+        clang_target_triple_underscore = clang_target_triple.replace('-', '_')
+        env[f'CC_{clang_target_triple_underscore}'] = ndk_clang
+        env[f'CXX_{clang_target_triple_underscore}'] = ndk_clangxx
+        # rustc linker
+        env[f'CARGO_TARGET_{rust_target_triple.upper()}_LINKER'] = ndk_clang
+        # We could also use a cross-compile wrapper
+        env["RUSTFLAGS"] += f' -Clink-arg=--target={clang_target_triple}'
+        env["RUSTFLAGS"] += f' -Clink-arg=--sysroot={ohos_sysroot}'
+
+        # CMake
+        cmake_toolchain_file = ndk_root.joinpath("build", "cmake", "ohos.toolchain.cmake")
+        if cmake_toolchain_file.is_file():
+            env[f'CMAKE_TOOLCHAIN_FILE_{rust_target_triple}'] = str(cmake_toolchain_file)
+        else:
+            print(
+                f"Warning: Failed to find the OpenHarmony CMake Toolchain file - Expected it at {cmake_toolchain_file}")
+        env[f'CMAKE_C_COMPILER_{rust_target_triple}'] = ndk_clang
+        env[f'CMAKE_CXX_COMPILER_{rust_target_triple}'] = ndk_clangxx
+
+        # pkg-config
+        pkg_config_path = '{}:{}'.format(str(ohos_sysroot.joinpath("usr", "lib", "pkgconfig"))
+                                         , str(ohos_sysroot.joinpath("usr", "share", "pkgconfig")))
+        env[f'PKG_CONFIG_SYSROOT_DIR_{rust_target_triple}'] = str(ohos_sysroot)
+        env[f'PKG_CONFIG_PATH_{rust_target_triple}'] = pkg_config_path
+
+        # bindgen / libclang-sys
+        env["LIBCLANG_PATH"] = path.join(llvm_toolchain, "lib")
+        env["CLANG_PATH"] = ndk_clangxx
+        env[f'CXXSTDLIB_{clang_target_triple_underscore}'] = "c++"
+        bindgen_extra_clangs_args_var = f'BINDGEN_EXTRA_CLANG_ARGS_{rust_target_triple}'
+        bindgen_extra_clangs_args = env.get(bindgen_extra_clangs_args_var, "")
+        bindgen_extra_clangs_args += " -D__MUSL__"
+        bindgen_extra_clangs_args += f' --target={clang_target_triple}'
+        bindgen_extra_clangs_args += f' --sysroot={ohos_sysroot}'
+        env[bindgen_extra_clangs_args_var] = bindgen_extra_clangs_args
+
 
     @staticmethod
     def common_command_arguments(build_configuration=False, build_type=False):
@@ -789,6 +920,7 @@ class CommandBase(object):
 
         self.cross_compile_target = cross_compile_target
         self.is_android_build = (cross_compile_target and "android" in cross_compile_target)
+        self.is_ohos_build = (cross_compile_target and cross_compile_target.endswith('-ohos'))
         self.target_path = servo.util.get_target_dir()
         if self.is_android_build:
             assert self.cross_compile_target
@@ -844,6 +976,8 @@ class CommandBase(object):
         if "--manifest-path" not in cargo_args:
             if self.is_android_build:
                 port = "jniapi"
+            elif self.is_ohos_build:
+                port = "ohos_simpleservo"
             else:
                 port = "servoshell"
             args += [

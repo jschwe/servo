@@ -489,7 +489,7 @@ where
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", not(target_env = "ohos")))]
     fn get_native_media_display_and_gl_context(
         rendering_context: &RenderingContext,
     ) -> Option<(NativeDisplay, GlContext)> {
@@ -526,7 +526,7 @@ where
         Some((native_display, gl_context))
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(not(any(target_os = "windows", all(target_os = "linux", not(target_env = "ohos")))))]
     fn get_native_media_display_and_gl_context(
         _rendering_context: &RenderingContext,
     ) -> Option<(NativeDisplay, GlContext)> {

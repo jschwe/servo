@@ -47,6 +47,9 @@ rustc = "crown"
 mozjs = { git = "ssh://git@rnd-gitlab-eu-c.huawei.com:2222/germany-research-center/dresden-lab/common/mirrors/mozjs.git", rev = "6bb4be2aef2e15c920b154b72d13ed5cabe7c02c" }
 surfman = { git = "https://github.com/jschwe/surfman", rev = "d69be471ee7e4d663a0b17339e71169334c0ea6e"}
 # bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", rev="b7de6ee766fdb3b2f2acdba6e31cd7eea0a62bbb" }
+# Status: No MR yet.
+font-kit  = { git = "https://github.com/jschwe/font-kit" , branch = "jschwender/main_ohos" }
+
 
 #[patch.'https://github.com/rust-lang/rust-bindgen.git']
 #bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", rev="b7de6ee766fdb3b2f2acdba6e31cd7eea0a62bbb" }

@@ -73,7 +73,7 @@ log = { workspace = true }
 raw-window-handle = "0.5"
 servo-media = { workspace = true }
 shellwords = "1.0.0"
-surfman = { workspace = true, features = ["sm-x11", "sm-raw-window-handle"] }
+surfman = { workspace = true, features = ["sm-x11", "sm-raw-window-handle-06"] }
 tinyfiledialogs = "3.0"
 webxr = { git = "https://github.com/servo/webxr", features = ["ipc", "glwindow", "headless"] }
 winit = "0.29.10"

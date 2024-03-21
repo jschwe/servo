@@ -35,3 +35,9 @@ RUSTC_BOOTSTRAP = "crown,script,style_tests"
 [build]
 rustdocflags = ["--document-private-items"]
 rustc = "crown"
+
+[patch.crates-io]
+napi-derive-ohos = { git = "https://github.com/jschwe/ohos-rs.git", branch = "jschwender/ohos" }
+# Status: Surfman is still being hacked on!
+# surfman = { path = "/home/jschwender/Dev/surfman/surfman" }
+surfman = { git = "https://github.com/servo/surfman" }

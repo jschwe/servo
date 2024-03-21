@@ -44,4 +44,20 @@ rustdocflags = ["--document-private-items"]
 rustc = "crown"
 
 [patch.crates-io]
-surfman = { git = "https://github.com/jschwe/surfman", rev = "d69be471ee7e4d663a0b17339e71169334c0ea6e"}
+napi-derive-ohos = { git = "https://github.com/jschwe/ohos-rs.git", branch = "jschwender/ohos" }
+raw-window-handle = { git = "https://github.com/jschwe/raw-window-handle" , branch = "jschwender/ohos" }
+# https://github.com/servo/rust-freetype/pull/72
+freetype = { git = "https://github.com/jschwe/rust-freetype", branch = "jschwender/ohos" }
+# raw-window-handle = { path = "/home/jschwender/Dev/raw-window-handle" }
+harfbuzz-sys = { git = "https://github.com/servo/rust-harfbuzz.git"}
+# Status: Surfman is still being hacked on!
+# surfman = { path = "/home/jschwender/Dev/surfman/surfman" }
+surfman = { git = "https://github.com/jschwe/surfman" , branch = "jschwender/ohos" }
+webxr = { git = "https://github.com/servo/webxr.git" }
+
+# Status: No MR yet.
+font-kit  = { git = "https://github.com/jschwe/font-kit" , branch = "jschwender/main_ohos" }
+
+
+# font-kit = { path = "/home/jschwender/Dev/font-kit"}
+

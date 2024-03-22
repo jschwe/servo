@@ -27,11 +27,15 @@ servo-media = { git = "https://github.com/servo/media" }
 surfman = { workspace = true, features = ["sm-angle-default"] }
 webxr = { git = "https://github.com/servo/webxr" }
 
+[target.'cfg(all(target_os = "linux", target_env = "ohos"))'.dependencies]
+ohos_hilog = "0.1"
+
 [build-dependencies]
 cc = "1.0"
 gl_generator = "0.14"
 serde_json = { workspace = true }
 vergen = { version = "8.0.0", features = ["git", "gitcl"] }
+cbindgen = "0.26.0"
 
 [features]
 debugmozjs = ["libservo/debugmozjs"]

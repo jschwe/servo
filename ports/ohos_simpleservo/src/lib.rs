@@ -1,11 +1,471 @@
 // /* This Source Code Form is subject to the terms of the Mozilla Public
 //  * License, v. 2.0. If a copy of the MPL was not distributed with this
 //  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 #![allow(non_snake_case)]
 
 mod gl_glue;
-// mod simpleservo;
+mod simpleservo;
+
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    os::raw::{c_char, c_void},
+};
+
+use servo::embedder_traits::PromptResult;
+use simpleservo::{Coordinates, EventLoopWaker, HostTrait, InitOptions, ServoGlue, SERVO};
+
+#[macro_use]
+extern crate log;
+use log::LevelFilter;
+use ohos_hilog::{Config, FilterBuilder};
+
+fn call<F>(f: F)
+where
+    F: Fn(&mut ServoGlue) -> Result<(), &str>,
+{
+    SERVO.with(|s| {
+        if let Err(error) = match s.borrow_mut().as_mut() {
+            Some(ref mut s) => (f)(s),
+            None => Err("Servo not available in this thread"),
+        } {
+            // TODO
+        }
+    });
+}
+#[repr(C)]
+pub struct ServoOptions {
+    pub args: *mut c_char,
+    pub url: *mut c_char,
+    pub coordinates: ServoCoordinates,
+    pub density: f32,
+    pub enable_subpixel_text_antialiasing: bool,
+    pub vr_external_context: u64,
+    pub log_str: *mut c_char,
+    pub gst_debug_str: *mut c_char,
+    pub enable_logs: bool,
+}
+
+#[repr(C)]
+pub struct ServoCoordinates {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub fb_width: i32,
+    pub fb_height: i32,
+}
+
+/// Get Servo Version
+/// 
+/// # Safety 
+///
+/// The [`free_string`] must be called after the [`servo_version`] is called.
+/// 
+/// # Examples(C++)
+/// ```
+/// char* version = servo_version();
+/// free_string(version);
+/// ```
+#[no_mangle]
+pub extern "C" fn servo_version() -> *mut c_char {
+    let version = simpleservo::servo_version();
+    let c_str = CString::new(version).expect("Failded to create CString");
+    c_str.into_raw()
+}
+
+/// Free a Rust CString
+/// 
+/// # Safety 
+///
+/// The [`ptr`] must have been previously allocated in Rust as a CString
+/// 
+/// # Examples(C++)
+/// ```
+/// char* version = servo_version();
+/// free_string(version);
+/// ```
+#[no_mangle]
+pub extern "C" fn free_string(ptr: *mut c_char) {
+    unsafe {
+        let _ = CString::from_raw(ptr);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn servo_init(opts: &mut ServoOptions, surface: *mut c_void) {
+    let (mut opts, log, log_str, _gst_debug_str) = match get_options(opts, surface) {
+        Ok((opts, log, log_str, gst_debug_str)) => (opts, log, log_str, gst_debug_str),
+        Err(err) => {
+            return;
+        },
+    };
+
+    if log {
+        let filters = [
+            "servo",
+            "simpleservo",
+            "simpleservo::jniapi",
+            "simpleservo::gl_glue::egl",
+            // Show JS errors by default.
+            "script::dom::bindings::error",
+            // Show GL errors by default.
+            "canvas::webgl_thread",
+            "compositing::compositor",
+            "constellation::constellation",
+        ];
+        let mut filter_builder = FilterBuilder::new();
+        for &module in &filters {
+            filter_builder.filter_module(module, LevelFilter::Debug);
+        }
+        if let Some(log_str) = log_str {
+            for module in log_str.split(',') {
+                filter_builder.filter_module(module, LevelFilter::Debug);
+            }
+        }
+
+        ohos_hilog::init_once(
+            Config::default()
+                .with_max_level(LevelFilter::Debug)
+                .with_filter(filter_builder.build())
+                .with_tag("simpleservo"),
+        )
+    }
+
+    info!("syx init");
+
+    // TODO callback config
+    let wakeup = Box::new(WakeupCallback::new());
+    let callbacks = Box::new(HostCallbacks::new());
+
+    if let Err(err) = gl_glue::egl::init()
+        .and_then(|egl_init| simpleservo::init(opts, egl_init.gl_wrapper, wakeup, callbacks))
+    {
+        // TODO
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn servo_resize(c_coords: &ServoCoordinates) {
+    let coords = c_coords_to_rust_coords(c_coords);
+    debug!("resize: {:#?}", coords);
+    call(|s| s.resize(coords.clone()));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_perform_updates() {
+    debug!("perform updates");
+    call(|s| s.perform_updates());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_set_batch_mode(batch: bool) {
+    debug!("set batch mode");
+    call(|s| s.set_batch_mode(batch));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_request_shutdown() {
+    debug!("request shutdown");
+    call(|s| s.request_shutdown());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_deinit() {
+    debug!("deinit");
+    simpleservo::deinit();
+}
+
+#[no_mangle]
+pub extern "C" fn servo_load_url(url: *mut c_char) {
+    debug!("load url");
+    match get_string_from_c_char(url) {
+        Some(url) => {
+            call(|s| s.load_uri(&url));
+        },
+        None => {
+            info!("Failed to load url");
+        },
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn servo_reload() {
+    debug!("reload");
+    call(|s| s.reload());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_stop() {
+    debug!("stop");
+    call(|s| s.stop());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_refresh() {
+    debug!("refresh");
+    call(|s| s.refresh());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_go_back() {
+    debug!("go back");
+    call(|s| s.go_back());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_go_farward() {
+    debug!("go forward");
+    call(|s| s.go_forward());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_scroll_start(dx: f32, dy: f32, x: i32, y: i32) {
+    debug!("scroll start");
+    call(|s| s.scroll_start(dx, dy, x, y));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_scroll_end(dx: f32, dy: f32, x: i32, y: i32) {
+    debug!("scroll end");
+    call(|s| s.scroll_end(dx, dy, x, y));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_scroll(dx: f32, dy: f32, x: i32, y: i32) {
+    debug!("scroll");
+    call(|s| s.scroll(dx, dy, x, y));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_touch_down(x: f32, y: f32, pointer_id: i32) {
+    debug!("touch down");
+    call(|s| s.touch_down(x, y, pointer_id));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_touch_up(x: f32, y: f32, pointer_id: i32) {
+    debug!("touch up");
+    call(|s| s.touch_up(x, y, pointer_id));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_touch_move(x: f32, y: f32, pointer_id: i32) {
+    debug!("touch move");
+    call(|s| s.touch_move(x, y, pointer_id));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_touch_cancel(x: f32, y: f32, pointer_id: i32) {
+    debug!("touch cancel");
+    call(|s| s.touch_cancel(x, y, pointer_id));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_pinch_zoom_start(factor: f32, x: i32, y: i32) {
+    debug!("pinch zoom start");
+    call(|s| s.pinchzoom_start(factor, x as u32, y as u32));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_pinch_zoom(factor: f32, x: i32, y: i32) {
+    debug!("pinch zoom");
+    call(|s| s.pinchzoom(factor, x as u32, y as u32));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_pinch_zoom_end(factor: f32, x: i32, y: i32) {
+    debug!("pinch zoom end");
+    call(|s| s.pinchzoom_end(factor, x as u32, y as u32));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_click(x: f32, y: f32) {
+    debug!("click");
+    call(|s| s.click(x, y));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_pause_compositor() {
+    debug!("pause compositor");
+    call(|s| s.pause_compositor());
+}
+
+#[no_mangle]
+pub extern "C" fn servo_resume_compositor(surface: *mut c_void, coordinates: &ServoCoordinates) {
+    debug!("resume compositor");
+    let coords = c_coords_to_rust_coords(coordinates);
+    call(|s| s.resume_compositor(surface, coords.clone()));
+}
+
+#[no_mangle]
+pub extern "C" fn servo_media_session_action(action: i32) {
+    debug!("media session action");
+    call(|s| s.media_session_action(action.into()));
+}
+
+fn get_options(
+    opts: &mut ServoOptions,
+    surface: *mut c_void,
+) -> Result<(InitOptions, bool, Option<String>, Option<String>), String> {
+    let args = get_string_from_c_char(opts.args);
+    let url = get_string_from_c_char(opts.url);
+    let log_str = get_string_from_c_char(opts.log_str);
+    let gst_debug_str = get_string_from_c_char(opts.gst_debug_str);
+    let density = opts.density;
+    let log = opts.enable_logs;
+    let coordinates = c_coords_to_rust_coords(&opts.coordinates);
+
+    let args = match args {
+        Some(args) => serde_json::from_str(&args)
+            .map_err(|_| "Invalid arguments. Servo arguments must be formatted as a JSON array")?,
+        None => None,
+    };
+
+    // disable JIT
+    let mut prefs = HashMap::new();
+    prefs.insert("js.baseline_interpreter.enabled".to_string(), false.into());
+    prefs.insert("js.baseline_jit.enabled".to_string(), false.into());
+    prefs.insert("js.ion.enabled".to_string(), false.into());
+
+    let opts = InitOptions {
+        args: args.unwrap_or(vec![]),
+        coordinates,
+        density,
+        xr_discovery: None,
+        surfman_integration: simpleservo::SurfmanIntegration::Widget(surface),
+        prefs: Some(prefs),
+    };
+
+    Ok((opts, log, log_str, gst_debug_str))
+}
+
+fn get_string_from_c_char(ptr: *mut c_char) -> Option<String> {
+    if ptr.is_null() {
+        return None;
+    }
+
+    unsafe {
+        let cstr = CStr::from_ptr(ptr);
+        match cstr.to_str() {
+            Ok(s) => Some(s.to_string()),
+            Err(_) => None,
+        }
+    }
+}
+
+fn c_coords_to_rust_coords(c_coords: &ServoCoordinates) -> Coordinates {
+    Coordinates::new(
+        c_coords.x,
+        c_coords.y,
+        c_coords.width,
+        c_coords.height,
+        c_coords.fb_width,
+        c_coords.fb_height,
+    )
+}
+
+// TODO WakeupCallback
+pub struct WakeupCallback {}
+
+impl WakeupCallback {
+    pub fn new() -> Self {
+        WakeupCallback {}
+    }
+}
+
+impl EventLoopWaker for WakeupCallback {
+    fn clone_box(&self) -> Box<dyn EventLoopWaker> {
+        Box::new(WakeupCallback {})
+    }
+
+    fn wake(&self) {}
+}
+
+// TODO HostCallbacks
+struct HostCallbacks {}
+
+impl HostCallbacks {
+    pub fn new() -> Self {
+        HostCallbacks {}
+    }
+}
+
+impl HostTrait for HostCallbacks {
+    fn prompt_alert(&self, msg: String, trusted: bool) {}
+
+    fn prompt_ok_cancel(&self, msg: String, trusted: bool) -> servo::embedder_traits::PromptResult {
+        warn!("Prompt not implemented. Cacelled. {}", msg);
+        PromptResult::Secondary
+    }
+
+    fn prompt_yes_no(&self, msg: String, trusted: bool) -> servo::embedder_traits::PromptResult {
+        warn!("Prompt not implemented. Cacelled. {}", msg);
+        PromptResult::Secondary
+    }
+
+    fn prompt_input(&self, msg: String, default: String, trusted: bool) -> Option<String> {
+        warn!("Input prompt not implemented. Cacelled. {}", msg);
+        Some(default)
+    }
+
+    fn on_load_started(&self) {}
+
+    fn on_load_ended(&self) {}
+
+    fn on_shutdown_complete(&self) {}
+
+    fn on_title_changed(&self, title: Option<String>) {}
+
+    fn on_allow_navigation(&self, url: String) -> bool {
+        false
+    }
+
+    fn on_url_changed(&self, url: String) {}
+
+    fn on_history_changed(&self, can_go_back: bool, can_go_forward: bool) {}
+
+    fn on_animating_changed(&self, animating: bool) {}
+
+    fn on_ime_show(
+        &self,
+        input_type: servo::msg::constellation_msg::InputMethodType,
+        text: Option<(String, i32)>,
+        multiline: bool,
+        bounds: servo::webrender_api::units::DeviceIntRect,
+    ) {
+    }
+
+    fn on_ime_hide(&self) {}
+
+    fn get_clipboard_contents(&self) -> Option<String> {
+        None
+    }
+
+    fn set_clipboard_contents(&self, contents: String) {}
+
+    fn on_media_session_metadata(&self, title: String, artist: String, album: String) {}
+
+    fn on_media_session_playback_state_change(
+        &self,
+        state: servo::embedder_traits::MediaSessionPlaybackState,
+    ) {
+    }
+
+    fn on_media_session_set_position_state(
+        &self,
+        duration: f64,
+        position: f64,
+        playback_rate: f64,
+    ) {
+    }
+
+    fn on_devtools_started(&self, port: Result<u16, ()>, token: String) {}
+
+    fn on_panic(&self, reason: String, backtrace: Option<String>) {}
+
+    fn show_context_menu(&self, title: Option<String>, items: Vec<String>) {}
+}
 
 // use std::collections::HashMap;
 // use std::os::raw::{c_char, c_int, c_void};

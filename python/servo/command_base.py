@@ -340,6 +340,9 @@ class CommandBase(object):
         elif target:
             base_path = path.join(base_path, target)
 
+        if  "-ohos" in target:
+            return path.join(base_path, build_type.directory_name(), "libsimpleservo.so")
+
         binary_name = f"servo{servo.platform.get().executable_suffix()}"
         binary_path = path.join(base_path, build_type.directory_name(), binary_name)
 

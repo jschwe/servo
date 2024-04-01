@@ -26,9 +26,11 @@ serde_json = { workspace = true }
 servo-media = { git = "https://github.com/servo/media" }
 surfman = { workspace = true, features = ["sm-angle-default"] }
 webxr = { git = "https://github.com/servo/webxr" }
+ctor = "0.2.7"
 
 [target.'cfg(all(target_os = "linux", target_env = "ohos"))'.dependencies]
 ohos_hilog = "0.1"
+ohos-sys = { git = "https://github.com/jschwe/ohos-sys.git" }
 
 [build-dependencies]
 cc = "1.0"

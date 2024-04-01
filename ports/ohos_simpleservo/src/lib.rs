@@ -12,6 +12,8 @@ use std::{
     os::raw::{c_char, c_void},
 };
 
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent;
+
 use servo::embedder_traits::PromptResult;
 use simpleservo::{Coordinates, EventLoopWaker, HostTrait, InitOptions, ServoGlue, SERVO};
 
@@ -56,12 +58,102 @@ pub struct ServoCoordinates {
     pub fb_height: i32,
 }
 
+use ohos_sys::napi::{napi_env, napi_value};
+
+extern "C" fn  on_surface_created_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+    info!("on_surface_created_cb");
+}
+
+extern "C" fn  on_surface_changed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+    info!("on_surface_changed_cb");
+}
+
+extern "C" fn  on_surface_destroyed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+    info!("on_surface_destroyed_cb");
+}
+
+extern "C" fn  on_dispatch_touch_event_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+    info!("DispatchTouchEvent");
+}
+
+// TODO: WIP-code, very un-rusty.
+extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
+{
+    use ohos_sys::napi::{napi_status, napi_get_named_property};
+    use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent, OH_NATIVE_XCOMPONENT_OBJ, OH_NativeXComponent_Callback};
+
+    ohos_hilog::init_once(
+        Config::default()
+            .with_max_level(LevelFilter::Debug)
+            .with_tag("simpleservo"),
+    );
+    info!("Servo Register callback called!");
+    let mut exportInstance: napi_value = core::ptr::null_mut();
+    let mut nativeXComponent: *mut OH_NativeXComponent = core::ptr::null_mut();
+
+    let status: napi_status = unsafe { napi_get_named_property(env, exports,
+        OH_NATIVE_XCOMPONENT_OBJ as *const u8,
+         &mut exportInstance as *mut _)
+    };
+    if status != napi_status::napi_ok {
+        error!("napi_get_named_property error: {status:?}");
+        return exports;
+    }
+    info!("napi_get_named_property call successfull");
+    let status = unsafe {
+        ohos_sys::napi::napi_unwrap(env, exportInstance,
+            &mut nativeXComponent as *mut *mut OH_NativeXComponent as *mut _)
+    };
+    if status != napi_status::napi_ok {
+        error!("napi_unwrap error on nativeXComponent: {status:?}");
+        return exports;
+    }
+    let mut cbs = OH_NativeXComponent_Callback {
+        OnSurfaceCreated: Some(on_surface_created_cb),
+        OnSurfaceChanged: Some(on_surface_changed_cb),
+        OnSurfaceDestroyed: Some(on_surface_destroyed_cb),
+        DispatchTouchEvent: Some(on_dispatch_touch_event_cb)
+    };
+    use  ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_RegisterCallback;
+    let res = unsafe {
+        OH_NativeXComponent_RegisterCallback(nativeXComponent, &mut cbs as *mut _)
+    };
+    if res != 0 {
+        error!("Failed to register callbacks");
+    }
+    else {
+        info!("Registerd callbacks successfully")
+    }
+     return exports;
+}
+
+use ctor::ctor;
+
+#[ctor]
+fn _init() {
+    use ohos_sys::napi::napi_module;
+    use core::ptr;
+    let mod_name = "servoentry\0";
+    let mut demoModule = napi_module {
+        nm_version: 1,
+        nm_flags: 0,
+        nm_filename: ptr::null(),
+        nm_register_func: Some(register),
+        nm_modname: mod_name.as_ptr(),
+        nm_priv: ptr::null_mut(),
+        reserved: [ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), ptr::null_mut()],
+    };
+    unsafe {
+        ohos_sys::napi::napi_module_register(&mut demoModule as *mut _);
+    }
+}
+
 /// Get Servo Version
-/// 
-/// # Safety 
+///
+/// # Safety
 ///
 /// The [`free_string`] must be called after the [`servo_version`] is called.
-/// 
+///
 /// # Examples(C++)
 /// ```
 /// char* version = servo_version();
@@ -75,11 +167,11 @@ pub extern "C" fn servo_version() -> *mut c_char {
 }
 
 /// Free a Rust CString
-/// 
-/// # Safety 
+///
+/// # Safety
 ///
 /// The [`ptr`] must have been previously allocated in Rust as a CString
-/// 
+///
 /// # Examples(C++)
 /// ```
 /// char* version = servo_version();

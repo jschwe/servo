@@ -22,6 +22,14 @@ extern crate log;
 use log::LevelFilter;
 use ohos_hilog::{Config, FilterBuilder};
 
+// target_link_libraries(servoentry PUBLIC libace_napi.z.so)
+// target_link_libraries(servoentry PUBLIC libace_ndk.z.so)
+// target_link_libraries(servoentry PUBLIC libhilog_ndk.z.so)
+#[link(name = "ace_napi.z")]
+#[link(name = "ace_ndk.z")]
+#[link(name = "hilog_ndk.z")]
+extern "C" {}
+
 fn call<F>(f: F)
 where
     F: Fn(&mut ServoGlue) -> Result<(), &str>,

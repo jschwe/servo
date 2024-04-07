@@ -15,6 +15,7 @@ use surfman::{
     GLVersion, NativeContext, NativeDevice, NativeWidget, Surface, SurfaceAccess, SurfaceInfo,
     SurfaceTexture, SurfaceType,
 };
+use log::info;
 
 /// A Servo rendering context, which holds all of the information needed
 /// to render Servo's layout, and bridges WebRender and surfman.
@@ -45,6 +46,7 @@ impl RenderingContext {
         adapter: &Adapter,
         surface_type: SurfaceType<NativeWidget>,
     ) -> Result<Self, Error> {
+        info!("connection.create_device()");
         let mut device = connection.create_device(adapter)?;
         let flags = ContextAttributeFlags::ALPHA |
             ContextAttributeFlags::DEPTH |
@@ -53,22 +55,28 @@ impl RenderingContext {
             GLApi::GLES => GLVersion { major: 3, minor: 0 },
             GLApi::GL => GLVersion { major: 3, minor: 2 },
         };
+        info!("GLVersion: {version:?}");
         let context_attributes = ContextAttributes { flags, version };
+        info!("device.create_context_descriptor()");
         let context_descriptor = device.create_context_descriptor(&context_attributes)?;
+        info!("device.create_context()");
         let mut context = device.create_context(&context_descriptor, None)?;
         let surface_access = SurfaceAccess::GPUOnly;
         let headless = match surface_type {
             SurfaceType::Widget { .. } => false,
             SurfaceType::Generic { .. } => true,
         };
+        info!("device.create_surface()");
         let surface = device.create_surface(&context, surface_access, surface_type)?;
+        info!("device.bind_surface_to_context()");
         device
             .bind_surface_to_context(&mut context, surface)
             .map_err(|(err, mut surface)| {
+                info!("Failed to bind surface to context: {err:?}");
                 let _ = device.destroy_surface(&mut context, &mut surface);
                 err
             })?;
-
+        info!("device.make_context_current()");
         device.make_context_current(&context)?;
 
         let swap_chain = if headless {

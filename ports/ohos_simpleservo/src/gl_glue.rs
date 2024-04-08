@@ -43,11 +43,14 @@ pub mod egl {
         unsafe {
             let egl = Egl;
             let display = egl.GetCurrentDisplay();
+            info!("Got current display..");
             egl.SwapInterval(display, 1);
+            info!("Running GlesFns::load_with");
             let egl = GlesFns::load_with(|addr| {
                 let addr = CString::new(addr.as_bytes()).unwrap();
                 let addr = addr.as_ptr();
                 let egl = Egl;
+                info!("Before egl.GetProcAddress(addr: {addr:?})");
                 egl.GetProcAddress(addr) as *const c_void
             });
             info!("EGL loaded");

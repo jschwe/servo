@@ -40,6 +40,7 @@ use servo::webrender_api::units::DevicePixel;
 use servo::webrender_api::ScrollLocation;
 use servo::{self, gl, Servo, TopLevelBrowsingContextId};
 use surfman::{Connection, SurfaceType};
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent_GetXComponentSize, OH_NativeXComponent};
 
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
@@ -237,63 +238,80 @@ pub fn set_pref(key: &str, val: PrefValue) -> Result<(), &'static str> {
 /// Initialize Servo. At that point, we need a valid GL context.
 /// In the future, this will be done in multiple steps.
 pub fn init(
-    mut init_opts: InitOptions,
+    native_window: *mut c_void,
+    xcomponent: *mut OH_NativeXComponent,
     gl: Rc<dyn gl::Gl>,
     waker: Box<dyn EventLoopWaker>,
     callbacks: Box<dyn HostTrait>,
 ) -> Result<(), &'static str> {
+    info!("Entered simpleservo init function");
     resources::set(Box::new(ResourceReaderInstance::new()));
 
-    if let Some(prefs) = init_opts.prefs {
-        add_user_prefs(prefs);
-    }
-
-    let mut args = mem::replace(&mut init_opts.args, vec![]);
-    // opts::from_cmdline_args expects the first argument to be the binary name.
-    args.insert(0, "servo".to_string());
-    opts::from_cmdline_args(Options::new(), &args);
-
-    let pref_url = ServoUrl::parse(&pref!(shell.homepage)).ok();
+    let pref_url = ServoUrl::parse("https://servo.org/").ok();
     let blank_url = ServoUrl::parse("about:blank").ok();
 
     let url = pref_url.or(blank_url).unwrap();
 
+    info!("Calling gl.clear_color() and co");
     gl.clear_color(1.0, 1.0, 1.0, 1.0);
     gl.clear(gl::COLOR_BUFFER_BIT);
     gl.finish();
+    info!("gl.finish()");
+
 
     // Initialize surfman
     let connection = Connection::new().or(Err("Failed to create connection"))?;
     let adapter = connection
         .create_adapter()
         .or(Err("Failed to create adapter"))?;
-    let surface_type = match init_opts.surfman_integration {
-        SurfmanIntegration::Widget(native_widget) => {
-            let native_widget = unsafe {
-                connection.create_native_widget_from_ptr(
-                    native_widget,
-                    init_opts.coordinates.framebuffer.to_untyped(),
-                )
-            };
-            SurfaceType::Widget { native_widget }
-        },
-        SurfmanIntegration::Surface => {
-            let size = init_opts.coordinates.framebuffer.to_untyped();
-            SurfaceType::Generic { size }
-        },
-    };
+
+    let mut width: u64 = 0;
+    let mut height: u64 = 0;
+    let res = unsafe { OH_NativeXComponent_GetXComponentSize(xcomponent, native_window,
+        &mut width as *mut _,
+        &mut height as *mut _) };
+    assert_eq!(res, 0, "OH_NativeXComponent_GetXComponentSize failed");
+
+    info!("Creating surfman widget");
+    use std::convert::TryInto;
+    let native_widget = unsafe {
+                    connection.create_native_widget_from_ptr(
+                        native_window,
+                        Size2D::new(width.try_into().unwrap(),
+                             height.try_into().unwrap()),
+                    )
+                };
+    let surface_type = SurfaceType::Widget { native_widget };
+    // let surface_type = match init_opts.surfman_integration {
+    //     SurfmanIntegration::Widget(native_widget) => {
+    //         let native_widget = unsafe {
+    //             connection.create_native_widget_from_ptr(
+    //                 native_widget,
+    //                 init_opts.coordinates.framebuffer.to_untyped(),
+    //             )
+    //         };
+    //         SurfaceType::Widget { native_widget }
+    //     },
+    //     SurfmanIntegration::Surface => {
+    //         let size = init_opts.coordinates.framebuffer.to_untyped();
+    //         SurfaceType::Generic { size }
+    //     },
+    // };
+    info!("Creating rendering context");
     let rendering_context = RenderingContext::create(&connection, &adapter, surface_type)
         .or(Err("Failed to create surface manager"))?;
 
+    info!("before ServoWindowCallbacks...");
+
     let window_callbacks = Rc::new(ServoWindowCallbacks {
         host_callbacks: callbacks,
-        coordinates: RefCell::new(init_opts.coordinates),
-        density: init_opts.density,
+        coordinates: todo!(), // RefCell::new(init_opts.coordinates),
+        density: 1, // init_opts.density,
         rendering_context: rendering_context.clone(),
     });
 
     let embedder_callbacks = Box::new(ServoEmbedderCallbacks {
-        xr_discovery: init_opts.xr_discovery,
+        xr_discovery: None,
         waker,
         gl: gl.clone(),
     });

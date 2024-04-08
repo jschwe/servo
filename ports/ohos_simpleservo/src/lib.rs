@@ -39,7 +39,7 @@ where
             Some(ref mut s) => (f)(s),
             None => Err("Servo not available in this thread"),
         } {
-            // TODO
+            error!("Failed to call with error {error}");
         }
     });
 }
@@ -68,8 +68,18 @@ pub struct ServoCoordinates {
 
 use ohos_sys::napi::{napi_env, napi_value};
 
-extern "C" fn  on_surface_created_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+extern "C" fn  on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
     info!("on_surface_created_cb");
+
+
+    let wakeup = Box::new(WakeupCallback::new());
+    let callbacks = Box::new(HostCallbacks::new());
+
+    if let Err(err) = gl_glue::egl::init()
+        .and_then(|egl_init| simpleservo::init(window, xcomponent, egl_init.gl_wrapper, wakeup, callbacks))
+    {
+        error!("egl::init() failed with {err:?}");
+    }
 }
 
 extern "C" fn  on_surface_changed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
@@ -132,6 +142,7 @@ extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
     else {
         info!("Registerd callbacks successfully")
     }
+
      return exports;
 }
 
@@ -156,94 +167,59 @@ fn _init() {
     }
 }
 
-/// Get Servo Version
-///
-/// # Safety
-///
-/// The [`free_string`] must be called after the [`servo_version`] is called.
-///
-/// # Examples(C++)
-/// ```
-/// char* version = servo_version();
-/// free_string(version);
-/// ```
-#[no_mangle]
-pub extern "C" fn servo_version() -> *mut c_char {
-    let version = simpleservo::servo_version();
-    let c_str = CString::new(version).expect("Failded to create CString");
-    c_str.into_raw()
-}
 
-/// Free a Rust CString
-///
-/// # Safety
-///
-/// The [`ptr`] must have been previously allocated in Rust as a CString
-///
-/// # Examples(C++)
-/// ```
-/// char* version = servo_version();
-/// free_string(version);
-/// ```
-#[no_mangle]
-pub extern "C" fn free_string(ptr: *mut c_char) {
-    unsafe {
-        let _ = CString::from_raw(ptr);
-    }
-}
+// #[no_mangle]
+// pub extern "C" fn servo_init(opts: &mut ServoOptions, surface: *mut c_void) {
+//     let (mut opts, log, log_str, _gst_debug_str) = match get_options(opts, surface) {
+//         Ok((opts, log, log_str, gst_debug_str)) => (opts, log, log_str, gst_debug_str),
+//         Err(err) => {
+//             return;
+//         },
+//     };
 
-#[no_mangle]
-pub extern "C" fn servo_init(opts: &mut ServoOptions, surface: *mut c_void) {
-    let (mut opts, log, log_str, _gst_debug_str) = match get_options(opts, surface) {
-        Ok((opts, log, log_str, gst_debug_str)) => (opts, log, log_str, gst_debug_str),
-        Err(err) => {
-            return;
-        },
-    };
+//     if log {
+//         let filters = [
+//             "servo",
+//             "simpleservo",
+//             "simpleservo::jniapi",
+//             "simpleservo::gl_glue::egl",
+//             // Show JS errors by default.
+//             "script::dom::bindings::error",
+//             // Show GL errors by default.
+//             "canvas::webgl_thread",
+//             "compositing::compositor",
+//             "constellation::constellation",
+//         ];
+//         let mut filter_builder = FilterBuilder::new();
+//         for &module in &filters {
+//             filter_builder.filter_module(module, LevelFilter::Debug);
+//         }
+//         if let Some(log_str) = log_str {
+//             for module in log_str.split(',') {
+//                 filter_builder.filter_module(module, LevelFilter::Debug);
+//             }
+//         }
 
-    if log {
-        let filters = [
-            "servo",
-            "simpleservo",
-            "simpleservo::jniapi",
-            "simpleservo::gl_glue::egl",
-            // Show JS errors by default.
-            "script::dom::bindings::error",
-            // Show GL errors by default.
-            "canvas::webgl_thread",
-            "compositing::compositor",
-            "constellation::constellation",
-        ];
-        let mut filter_builder = FilterBuilder::new();
-        for &module in &filters {
-            filter_builder.filter_module(module, LevelFilter::Debug);
-        }
-        if let Some(log_str) = log_str {
-            for module in log_str.split(',') {
-                filter_builder.filter_module(module, LevelFilter::Debug);
-            }
-        }
+//         ohos_hilog::init_once(
+//             Config::default()
+//                 .with_max_level(LevelFilter::Debug)
+//                 .with_filter(filter_builder.build())
+//                 .with_tag("simpleservo"),
+//         )
+//     }
 
-        ohos_hilog::init_once(
-            Config::default()
-                .with_max_level(LevelFilter::Debug)
-                .with_filter(filter_builder.build())
-                .with_tag("simpleservo"),
-        )
-    }
+//     info!("syx init");
 
-    info!("syx init");
+//     // TODO callback config
+//     let wakeup = Box::new(WakeupCallback::new());
+//     let callbacks = Box::new(HostCallbacks::new());
 
-    // TODO callback config
-    let wakeup = Box::new(WakeupCallback::new());
-    let callbacks = Box::new(HostCallbacks::new());
-
-    if let Err(err) = gl_glue::egl::init()
-        .and_then(|egl_init| simpleservo::init(opts, egl_init.gl_wrapper, wakeup, callbacks))
-    {
-        // TODO
-    }
-}
+//     if let Err(err) = gl_glue::egl::init()
+//         .and_then(|egl_init| simpleservo::init(opts, egl_init.gl_wrapper, wakeup, callbacks))
+//     {
+//         error!("egl::init() failed with {err:?}");
+//     }
+// }
 
 #[no_mangle]
 pub extern "C" fn servo_resize(c_coords: &ServoCoordinates) {

@@ -9,25 +9,28 @@ mod simpleservo;
 use std::{
     collections::HashMap,
     ffi::{CStr, CString},
-    os::raw::{c_char, c_void},
+    os::raw::{c_char, c_void}, time::Duration,
 };
+use std::sync::mpsc;
+use std::thread;
 
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent;
 
 use servo::embedder_traits::PromptResult;
 use simpleservo::{Coordinates, EventLoopWaker, HostTrait, InitOptions, ServoGlue, SERVO};
 
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentOffset;
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
+
 #[macro_use]
 extern crate log;
 use log::LevelFilter;
 use ohos_hilog::{Config, FilterBuilder};
 
-// target_link_libraries(servoentry PUBLIC libace_napi.z.so)
-// target_link_libraries(servoentry PUBLIC libace_ndk.z.so)
-// target_link_libraries(servoentry PUBLIC libhilog_ndk.z.so)
 #[link(name = "ace_napi.z")]
 #[link(name = "ace_ndk.z")]
 #[link(name = "hilog_ndk.z")]
+#[link(name = "clang_rt.builtins", kind = "static")]
 extern "C" {}
 
 fn call<F>(f: F)
@@ -67,19 +70,56 @@ pub struct ServoCoordinates {
 }
 
 use ohos_sys::napi::{napi_env, napi_value};
+use std::sync::mpsc::{Sender, Receiver};
+
+#[repr(transparent)]
+struct XComponentWrapper(*mut OH_NativeXComponent);
+#[repr(transparent)]
+struct WindowWrapper(*mut c_void);
+unsafe impl Send for XComponentWrapper {}
+unsafe impl Send for WindowWrapper {}
+
+
 
 extern "C" fn  on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
     info!("on_surface_created_cb");
 
+    let (tx_done, rx_done): (Sender<Result<(), &'static str>>, Receiver<Result<(), &'static str>>) = mpsc::channel();
+    let xc_wrapper = XComponentWrapper(xcomponent);
+    let window_wrapper = WindowWrapper(window);
 
-    let wakeup = Box::new(WakeupCallback::new());
-    let callbacks = Box::new(HostCallbacks::new());
+    // Each thread will send its id via the channel
+    let main_surface_thread = thread::spawn(move || {
 
-    if let Err(err) = gl_glue::egl::init()
-        .and_then(|egl_init| simpleservo::init(window, xcomponent, egl_init.gl_wrapper, wakeup, callbacks))
-    {
-        error!("egl::init() failed with {err:?}");
+        let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
+
+        let wakeup = Box::new(WakeupCallback::new(tx));
+        let callbacks = Box::new(HostCallbacks::new());
+
+        if let Err(err) = gl_glue::egl::init()
+            .and_then(|egl_init| simpleservo::init(window_wrapper.0, xc_wrapper.0, egl_init.gl_wrapper, wakeup, callbacks))
+        {
+            error!("egl::init() failed with {err:?}");
+        }
+        info!("Surface created!");
+        tx_done.send(Ok(())).unwrap();
+        drop(tx_done);
+
+        while let Ok(_) = rx.recv() {
+            info!("Wakeup message received!");
+            call(|s| s.perform_updates());
+        }
+
+        info!("Sender disconnected - Terminating main surface thread");
+    });
+
+    match rx_done.recv() {
+        Ok(Err(reason)) => error!("Failed to initialize servo with {reason}"),
+        Ok(Ok(())) => {},
+        Err(e) => error!("Channel failure"),
     }
+    info!("Returning from on_surface_created_cb");
+
 }
 
 extern "C" fn  on_surface_changed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
@@ -441,21 +481,28 @@ fn c_coords_to_rust_coords(c_coords: &ServoCoordinates) -> Coordinates {
     )
 }
 
-// TODO WakeupCallback
-pub struct WakeupCallback {}
+#[derive(Clone)]
+pub struct WakeupCallback {
+    chan: Sender<()>
+}
 
 impl WakeupCallback {
-    pub fn new() -> Self {
-        WakeupCallback {}
+    pub fn new(chan: Sender<()>) -> Self {
+        WakeupCallback {
+            chan
+        }
     }
 }
 
 impl EventLoopWaker for WakeupCallback {
     fn clone_box(&self) -> Box<dyn EventLoopWaker> {
-        Box::new(WakeupCallback {})
+        Box::new(self.clone())
     }
 
-    fn wake(&self) {}
+    fn wake(&self) {
+        info!("wake called!");
+        self.chan.send(());
+    }
 }
 
 // TODO HostCallbacks

@@ -50,7 +50,6 @@ pub mod egl {
                 let addr = CString::new(addr.as_bytes()).unwrap();
                 let addr = addr.as_ptr();
                 let egl = Egl;
-                info!("Before egl.GetProcAddress(addr: {addr:?})");
                 egl.GetProcAddress(addr) as *const c_void
             });
             info!("EGL loaded");

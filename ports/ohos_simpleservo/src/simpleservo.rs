@@ -26,7 +26,7 @@ pub use servo::embedder_traits::{
 use servo::embedder_traits::{
     EmbedderMsg, EmbedderProxy, MediaSessionEvent, PromptDefinition, PromptOrigin,
 };
-use servo::euclid::{Point2D, Rect, Scale, Size2D, Vector2D};
+use servo::euclid::{Box2D, Point2D, Rect, Scale, Size2D, Vector2D};
 use servo::keyboard_types::{Key, KeyState, KeyboardEvent};
 pub use servo::msg::constellation_msg::InputMethodType;
 use servo::msg::constellation_msg::{TraversalDirection, WebViewId};
@@ -40,7 +40,7 @@ use servo::webrender_api::units::DevicePixel;
 use servo::webrender_api::ScrollLocation;
 use servo::{self, gl, Servo, TopLevelBrowsingContextId};
 use surfman::{Connection, SurfaceType};
-use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent_GetXComponentSize, OH_NativeXComponent};
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent_GetXComponentSize, OH_NativeXComponent, OH_NativeXComponent_GetXComponentOffset};
 
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
@@ -271,14 +271,16 @@ pub fn init(
         &mut width as *mut _,
         &mut height as *mut _) };
     assert_eq!(res, 0, "OH_NativeXComponent_GetXComponentSize failed");
-
-    info!("Creating surfman widget");
+    let width: i32 = width.try_into().expect("Width to large");
+    let height: i32 = height.try_into().expect("Height to large");
+    info!("Creating surfman widget with width {width} and height {height}");
     use std::convert::TryInto;
     let native_widget = unsafe {
-                    connection.create_native_widget_from_ptr(
+                    connection.create_native_widget_from_ptr_ohos(
+                        xcomponent as *mut _,
                         native_window,
-                        Size2D::new(width.try_into().unwrap(),
-                             height.try_into().unwrap()),
+                        Size2D::new(width,
+                             height),
                     )
                 };
     let surface_type = SurfaceType::Widget { native_widget };
@@ -305,8 +307,9 @@ pub fn init(
 
     let window_callbacks = Rc::new(ServoWindowCallbacks {
         host_callbacks: callbacks,
-        coordinates: todo!(), // RefCell::new(init_opts.coordinates),
-        density: 1, // init_opts.density,
+        // todo: .....
+        coordinates:  RefCell::new(Coordinates::new(0,0,width,height,width,height)), // RefCell::new(init_opts.coordinates),
+        density: 1.0, // init_opts.density,
         rendering_context: rendering_context.clone(),
     });
 
@@ -909,7 +912,7 @@ impl WindowMethods for ServoWindowCallbacks {
     fn get_coordinates(&self) -> EmbedderCoordinates {
         let coords = self.coordinates.borrow();
         EmbedderCoordinates {
-            viewport: todo!(), // coords.viewport, // FIXME: perhaps webrender patch problem?
+            viewport: coords.viewport.to_box2d(),
             framebuffer: coords.framebuffer,
             window: (coords.viewport.size, Point2D::new(0, 0)),
             screen: coords.viewport.size,

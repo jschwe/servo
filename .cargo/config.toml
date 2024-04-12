@@ -59,5 +59,3 @@ font-kit  = { git = "https://github.com/jschwe/font-kit" , branch = "jschwender/
 # https://github.com/PistonDevelopers/freetype-sys/pull/124
 freetype-sys  = { git = "https://github.com/jschwe/freetype-sys" , branch = "jschwender/ohos_hack" }
 # freetype-sys = {path = "/home/jschwender/Dev/freetype-sys" }
-# updates font-kit dep, https://github.com/jrmuizel/raqote/pull/200
-raqote = { git = "https://github.com/Nopey/raqote.git", rev = "040b213c21ee0e054544ec2a760cfb79e6517c25"}

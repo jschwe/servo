@@ -41,13 +41,4 @@ fn main() {
     let file = File::create(&dest.join("prefs.json")).unwrap();
     serde_json::to_writer(file, &prefs).unwrap();
 
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    cbindgen::Builder::new()
-        .with_crate(crate_dir)
-        .with_language(cbindgen::Language::Cxx)
-        .with_pragma_once(true)
-        .with_include_guard("LIB_SIMPLESERVO_H")
-        .generate()
-        .expect("Unable to generate bindings")
-        .write_to_file("simpleservo.h");
 }

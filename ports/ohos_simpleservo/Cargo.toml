@@ -37,7 +37,6 @@ cc = "1.0"
 gl_generator = "0.14"
 serde_json = { workspace = true }
 vergen = { version = "8.0.0", features = ["git", "gitcl"] }
-cbindgen = "0.26.0"
 
 [features]
 debugmozjs = ["libservo/debugmozjs"]

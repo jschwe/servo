@@ -243,7 +243,7 @@ pub fn init(
     gl: Rc<dyn gl::Gl>,
     waker: Box<dyn EventLoopWaker>,
     callbacks: Box<dyn HostTrait>,
-) -> Result<(), &'static str> {
+) -> Result<ServoGlue, &'static str> {
     info!("Entered simpleservo init function");
     resources::set(Box::new(ResourceReaderInstance::new()));
 
@@ -326,28 +326,23 @@ pub fn init(
         CompositeTarget::Window,
     );
 
-    SERVO.with(|s| {
-        let mut servo_glue = ServoGlue {
-            rendering_context,
-            servo: servo.servo,
-            batch_mode: false,
-            callbacks: window_callbacks,
-            events: vec![],
-            context_menu_sender: None,
-            webviews: HashMap::default(),
-            creation_order: vec![],
-            focused_webview_id: None,
-        };
-        let _ = servo_glue.process_event(EmbedderEvent::NewWebView(url, servo.browser_id));
-        *s.borrow_mut() = Some(servo_glue);
-    });
 
-    Ok(())
+    let mut servo_glue = ServoGlue {
+        rendering_context,
+        servo: servo.servo,
+        batch_mode: false,
+        callbacks: window_callbacks,
+        events: vec![],
+        context_menu_sender: None,
+        webviews: HashMap::default(),
+        creation_order: vec![],
+        focused_webview_id: None,
+    };
+    let _ = servo_glue.process_event(EmbedderEvent::NewWebView(url, servo.browser_id));
+
+    Ok(servo_glue)
 }
 
-pub fn deinit() {
-    SERVO.with(|s| s.replace(None).unwrap().deinit());
-}
 
 impl ServoGlue {
     fn get_browser_id(&self) -> Result<TopLevelBrowsingContextId, &'static str> {

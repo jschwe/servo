@@ -198,7 +198,7 @@ extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
     };
     if status != napi_status::napi_ok {
         error!("napi_get_named_property error: {status:?}");
-        unsafe { napi_throw_error(env, core::ptr::null(), "Failed to get JsXcomponent...\0".as_ptr()); }
+        unsafe { napi_throw_error(env as *mut _, core::ptr::null(), "Failed to get JsXcomponent...\0".as_ptr()); }
         // return exports;
     } else {
         info!("napi_get_named_property call successfull");

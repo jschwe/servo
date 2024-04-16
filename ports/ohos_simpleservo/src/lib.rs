@@ -34,10 +34,16 @@ use ohos_hilog::{Config, FilterBuilder};
 #[link(name = "clang_rt.builtins", kind = "static")]
 extern "C" {}
 
-fn call(action: ServoAction) -> Result<(), &'static str>
+#[derive(Debug)]
+enum CallError{
+    ChannelNotInitialized,
+    ChannelDied,
+}
+
+fn call(action: ServoAction) -> Result<(), CallError>
 {
-        let tx = SERVO_CHANNEL.get().expect("Servo channel not initialized yet");
-        tx.send(action).expect("Channel dead...");
+        let tx = SERVO_CHANNEL.get().ok_or(CallError::ChannelNotInitialized)?;
+        tx.send(action).map_err(|_| CallError::ChannelDied)?;
         Ok(())
 }
 #[repr(C)]
@@ -73,18 +79,51 @@ struct WindowWrapper(*mut c_void);
 unsafe impl Send for XComponentWrapper {}
 unsafe impl Send for WindowWrapper {}
 
+#[derive(Debug, Copy, Clone)]
+enum TouchEventType {
+    Down,
+    Up,
+    Move,
+    Cancel,
+    Unknown,
+}
+
+impl From<OH_NativeXComponent_TouchEventType> for TouchEventType {
+    fn from(value: OH_NativeXComponent_TouchEventType) -> Self {
+        match value {
+            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_DOWN => TouchEventType::Down,
+            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_UP => TouchEventType::Up,
+            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_MOVE => TouchEventType::Move,
+            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_CANCEL => TouchEventType::Cancel,
+            _ => TouchEventType::Unknown,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum ServoAction {
     WakeUp,
     LoadUrl(String),
+    TouchEvent{kind: TouchEventType, x: f32, y: f32, pointer_id: i32},
 }
 
 impl ServoAction {
+    fn dispatch_touch_event(servo: &mut ServoGlue, kind: TouchEventType, x: f32, y: f32, pointer_id: i32) -> Result<(), &'static str> {
+        match kind {
+            TouchEventType::Down => servo.touch_down(x, y, pointer_id),
+            TouchEventType::Up => servo.touch_up(x, y, pointer_id),
+            TouchEventType::Move => servo.touch_move(x, y, pointer_id),
+            TouchEventType::Cancel => servo.touch_cancel(x, y, pointer_id),
+            TouchEventType::Unknown => Err("Can't dispatch Unknown Touch Event"),
+        }
+    }
+
     fn do_action(&self, servo: &mut ServoGlue) {
         use ServoAction::*;
         let res = match self {
             WakeUp => servo.perform_updates(),
-            LoadUrl(url) => servo.load_uri(url.as_str()) ,
+            LoadUrl(url) => servo.load_uri(url.as_str()),
+            TouchEvent {kind, x, y, pointer_id} => Self::dispatch_touch_event(servo, *kind, *x, *y, *pointer_id),
         };
         if let Err(e) = res {
             error!("Failed to do {self:?} with error {e}");
@@ -145,21 +184,29 @@ pub extern "C" fn  on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, w
 
 
 // Todo: Probably we need to block here, until the main thread has processed the change.
-extern "C" fn  on_surface_changed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+pub extern "C" fn  on_surface_changed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
     info!("on_surface_changed_cb");
 }
 
-extern "C" fn  on_surface_destroyed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+pub extern "C" fn  on_surface_destroyed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
     error!("on_surface_destroyed_cb is currently not implemented");
 }
 
-extern "C" fn  on_dispatch_touch_event_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
+pub extern "C" fn  on_dispatch_touch_event_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
     info!("DispatchTouchEvent");
     let mut touch_event: MaybeUninit<OH_NativeXComponent_TouchEvent> = MaybeUninit::uninit();
     let res = unsafe {
         OH_NativeXComponent_GetTouchEvent(component, window, touch_event.as_mut_ptr())
     };
-    // call(|s| s.perform_updates());
+    if res != 0 {
+        error!("OH_NativeXComponent_GetTouchEvent failed with {res}");
+        return;
+    }
+    let touch_event = unsafe { touch_event.assume_init()};
+    let kind = TouchEventType::from(touch_event.type_);
+    if let Err(e) = call(ServoAction::TouchEvent {kind, x: touch_event.x, y: touch_event.y, pointer_id: touch_event.id}) {
+        error!("Failed to dispatch call for touch Event {kind:?}");
+    }
 }
 
 fn initialize_logging_once() {

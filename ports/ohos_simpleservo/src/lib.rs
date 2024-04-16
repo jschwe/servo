@@ -14,12 +14,12 @@ use std::thread;
 use ctor::ctor;
 use core::ptr;
 
-use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NATIVE_XCOMPONENT_OBJ, OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_TouchEvent};
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NATIVE_XCOMPONENT_OBJ, OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_TouchEvent, OH_NativeXComponent_TouchEventType};
 
 use servo::embedder_traits::PromptResult;
 use simpleservo::{Coordinates, EventLoopWaker, HostTrait, InitOptions, ServoGlue, SERVO};
 
-use ohos_sys::napi::napi_module;
+use ohos_sys::napi::{napi_define_properties, napi_module, napi_status};
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentOffset;
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
 
@@ -207,15 +207,15 @@ extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
                 &mut nativeXComponent as *mut *mut OH_NativeXComponent as *mut _)
         };
         if status == napi_status::napi_ok {
-            let mut cbs = OH_NativeXComponent_Callback {
+            let mut cbs = Box::new(OH_NativeXComponent_Callback {
                 OnSurfaceCreated: Some(on_surface_created_cb),
                 OnSurfaceChanged: Some(on_surface_changed_cb),
                 OnSurfaceDestroyed: Some(on_surface_destroyed_cb),
                 DispatchTouchEvent: Some(on_dispatch_touch_event_cb)
-            };
+            });
             use  ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_RegisterCallback;
             let res = unsafe {
-                OH_NativeXComponent_RegisterCallback(nativeXComponent, &mut cbs as *mut _)
+                OH_NativeXComponent_RegisterCallback(nativeXComponent, Box::leak(cbs) as *mut _)
             };
             if res != 0 {
                 error!("Failed to register callbacks");
@@ -242,11 +242,11 @@ extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
         data: core::ptr::null_mut(),
     }];
 
-    let res =unsafe {
-        napi_define_properties(env.cast(), exports.cast(),
-            properties.len(), properties.as_ptr())
+    let res = unsafe {
+        napi_define_properties(env, exports,
+            properties.len(), properties.as_ptr().cast())
     };
-    if res == 0 {
+    if res == napi_status::napi_ok {
         info!("Registered Node functions successfully");
     }
     else {
@@ -308,7 +308,7 @@ fn _init() {
 //     debug!("deinit");
 //     simpleservo::deinit();
 // }
-use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_define_properties, napi_property_descriptor, napi_throw_error}, JsObject, JsUnknown, NapiRaw, NapiValue};
+use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_property_descriptor, napi_throw_error}, JsObject, JsUnknown, NapiRaw, NapiValue};
 use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::sys::napi_unwrap;
 

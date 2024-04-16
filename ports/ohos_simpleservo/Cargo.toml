@@ -45,4 +45,5 @@ debugmozjs = ["libservo/debugmozjs"]
 # TODO: Once the native-bluetooth feature works for
 # Android, re-add it here.
 default = ["max_log_level"]
-max_log_level = ["log/release_max_level_info"]
+#max_log_level = ["log/release_max_level_info"]
+max_log_level = ["log/release_max_level_error"]

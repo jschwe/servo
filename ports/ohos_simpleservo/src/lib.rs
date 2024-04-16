@@ -7,16 +7,19 @@ mod gl_glue;
 mod simpleservo;
 
 use std::{
-    collections::HashMap, ffi::{CStr, CString}, mem::MaybeUninit, os::raw::{c_char, c_void}, sync::OnceLock, time::Duration
+    collections::HashMap, ffi::{CStr, CString}, mem::MaybeUninit, os::raw::{c_char, c_void}, sync::{atomic::AtomicUsize, Once, OnceLock}, time::Duration
 };
 use std::sync::mpsc;
 use std::thread;
+use ctor::ctor;
+use core::ptr;
 
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NATIVE_XCOMPONENT_OBJ, OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_TouchEvent};
 
 use servo::embedder_traits::PromptResult;
 use simpleservo::{Coordinates, EventLoopWaker, HostTrait, InitOptions, ServoGlue, SERVO};
 
+use ohos_sys::napi::napi_module;
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentOffset;
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
 
@@ -92,8 +95,8 @@ impl ServoAction {
 static SERVO_CHANNEL: OnceLock<Sender<ServoAction>> = OnceLock::new();
 
 
-
-extern "C" fn  on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
+#[no_mangle]
+pub extern "C" fn  on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window: *mut c_void) {
     info!("on_surface_created_cb");
 
     let (tx_done, rx_done): (Sender<Result<(), &'static str>>, Receiver<Result<(), &'static str>>) = mpsc::channel();
@@ -159,61 +162,73 @@ extern "C" fn  on_dispatch_touch_event_cb(component: *mut OH_NativeXComponent, w
     // call(|s| s.perform_updates());
 }
 
+fn initialize_logging_once() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        ohos_hilog::init_once(
+            Config::default()
+                .with_max_level(LevelFilter::Debug)
+                .with_tag("simpleservo"),
+        );
+        info!("Servo Register callback called!");
+
+        std::panic::set_hook(Box::new(|info| {
+            error!("Panic in Rust code");
+            error!("PanicInfo: {info}");
+        }));
+    })
+}
+
 // TODO: WIP-code, very un-rusty.
 extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
 {
     use ohos_sys::napi::{napi_status, napi_get_named_property};
     use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent, OH_NATIVE_XCOMPONENT_OBJ, OH_NativeXComponent_Callback};
 
-    ohos_hilog::init_once(
-        Config::default()
-            .with_max_level(LevelFilter::Debug)
-            .with_tag("simpleservo"),
-    );
-    info!("Servo Register callback called!");
+    initialize_logging_once();
 
-    std::panic::set_hook(Box::new(|info| {
-        error!("Panic in Rust code: {info}");
-    }));
-
-
+    // For some reason the register function is called twice, and napi_unwrap fails the first time.
+    //if XCOMPONENT_REGISTERED.load(std::sync::atomic::Ordering::Acquire) == 1 {
     let mut exportInstance: napi_value = core::ptr::null_mut();
     let mut nativeXComponent: *mut OH_NativeXComponent = core::ptr::null_mut();
 
     let status: napi_status = unsafe { napi_get_named_property(env, exports,
         OH_NATIVE_XCOMPONENT_OBJ as *const u8,
-         &mut exportInstance as *mut _)
+        &mut exportInstance as *mut _)
     };
     if status != napi_status::napi_ok {
         error!("napi_get_named_property error: {status:?}");
-        unsafe { napi_throw_error(env as *mut _, core::ptr::null(), "Failed to get JsXcomponent...\0".as_ptr()); }
+        unsafe { napi_throw_error(env, core::ptr::null(), "Failed to get JsXcomponent...\0".as_ptr()); }
         // return exports;
-    }
-    info!("napi_get_named_property call successfull");
-    let status = unsafe {
-        ohos_sys::napi::napi_unwrap(env, exportInstance,
-            &mut nativeXComponent as *mut *mut OH_NativeXComponent as *mut _)
-    };
-    if status != napi_status::napi_ok {
-        error!("napi_unwrap error on nativeXComponent: {status:?}");
-        // return exports;
-    }
-
-    let mut cbs = OH_NativeXComponent_Callback {
-        OnSurfaceCreated: Some(on_surface_created_cb),
-        OnSurfaceChanged: Some(on_surface_changed_cb),
-        OnSurfaceDestroyed: Some(on_surface_destroyed_cb),
-        DispatchTouchEvent: Some(on_dispatch_touch_event_cb)
-    };
-    use  ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_RegisterCallback;
-    let res = unsafe {
-        OH_NativeXComponent_RegisterCallback(nativeXComponent, &mut cbs as *mut _)
-    };
-    if res != 0 {
-        error!("Failed to register callbacks");
-    }
-    else {
-        info!("Registerd callbacks successfully")
+    } else {
+        info!("napi_get_named_property call successfull");
+        let status = unsafe {
+            ohos_sys::napi::napi_unwrap(env, exportInstance,
+                &mut nativeXComponent as *mut *mut OH_NativeXComponent as *mut _)
+        };
+        if status == napi_status::napi_ok {
+            let mut cbs = OH_NativeXComponent_Callback {
+                OnSurfaceCreated: Some(on_surface_created_cb),
+                OnSurfaceChanged: Some(on_surface_changed_cb),
+                OnSurfaceDestroyed: Some(on_surface_destroyed_cb),
+                DispatchTouchEvent: Some(on_dispatch_touch_event_cb)
+            };
+            use  ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_RegisterCallback;
+            let res = unsafe {
+                OH_NativeXComponent_RegisterCallback(nativeXComponent, &mut cbs as *mut _)
+            };
+            if res != 0 {
+                error!("Failed to register callbacks");
+            }
+            else {
+                info!("Registerd callbacks successfully");
+                XCOMPONENT_REGISTERED.fetch_add(1, std::sync::atomic::Ordering::Release);
+            }
+            }
+        else {
+            error!("napi_unwrap error on nativeXComponent: {status:?}");
+            // return exports;
+        }
     }
 
     let properties: [napi_property_descriptor;1] = [napi_property_descriptor {
@@ -228,93 +243,40 @@ extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
     }];
 
     let res =unsafe {
-        napi_define_properties(env as *mut _, exports as *mut _,
+        napi_define_properties(env.cast(), exports.cast(),
             properties.len(), properties.as_ptr())
     };
-    if res != 0 {
-        error!("Failed to register Node functions");
+    if res == 0 {
+        info!("Registered Node functions successfully");
     }
     else {
-        info!("Registered Node functions successfully")
+        error!("Failed to register Node functions");
     }
-
     return exports;
 }
 
-use ctor::ctor;
+struct NapiModule(napi_module);
+unsafe impl Sync for NapiModule {}
+
+static SERVO_MOD_NAME: &'static str = "simpleservo\0";
+static mut DEMO_MODULE: NapiModule = NapiModule(napi_module{
+    nm_version: 1,
+    nm_flags: 0,
+    nm_filename: ptr::null(),
+    nm_register_func: Some(register),
+    nm_modname: SERVO_MOD_NAME.as_ptr(),
+    nm_priv: ptr::null_mut(),
+    reserved: [ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), ptr::null_mut()],
+});
+
 
 #[ctor]
 fn _init() {
-    use ohos_sys::napi::napi_module;
-    use core::ptr;
-    let mod_name = "simpleservo\0";
-    let mut demoModule = napi_module {
-        nm_version: 1,
-        nm_flags: 0,
-        nm_filename: ptr::null(),
-        nm_register_func: Some(register),
-        nm_modname: mod_name.as_ptr(),
-        nm_priv: ptr::null_mut(),
-        reserved: [ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), ptr::null_mut()],
-    };
     unsafe {
-        ohos_sys::napi::napi_module_register(&mut demoModule as *mut _);
+        // Note: This function seems to require napi_module to live long
+        ohos_sys::napi::napi_module_register(&mut DEMO_MODULE.0 as *mut napi_module);
     }
 }
-
-
-// #[no_mangle]
-// pub extern "C" fn servo_init(opts: &mut ServoOptions, surface: *mut c_void) {
-//     let (mut opts, log, log_str, _gst_debug_str) = match get_options(opts, surface) {
-//         Ok((opts, log, log_str, gst_debug_str)) => (opts, log, log_str, gst_debug_str),
-//         Err(err) => {
-//             return;
-//         },
-//     };
-
-//     if log {
-//         let filters = [
-//             "servo",
-//             "simpleservo",
-//             "simpleservo::jniapi",
-//             "simpleservo::gl_glue::egl",
-//             // Show JS errors by default.
-//             "script::dom::bindings::error",
-//             // Show GL errors by default.
-//             "canvas::webgl_thread",
-//             "compositing::compositor",
-//             "constellation::constellation",
-//         ];
-//         let mut filter_builder = FilterBuilder::new();
-//         for &module in &filters {
-//             filter_builder.filter_module(module, LevelFilter::Debug);
-//         }
-//         if let Some(log_str) = log_str {
-//             for module in log_str.split(',') {
-//                 filter_builder.filter_module(module, LevelFilter::Debug);
-//             }
-//         }
-
-//         ohos_hilog::init_once(
-//             Config::default()
-//                 .with_max_level(LevelFilter::Debug)
-//                 .with_filter(filter_builder.build())
-//                 .with_tag("simpleservo"),
-//         )
-//     }
-
-//     info!("syx init");
-
-//     // TODO callback config
-//     let wakeup = Box::new(WakeupCallback::new());
-//     let callbacks = Box::new(HostCallbacks::new());
-
-//     if let Err(err) = gl_glue::egl::init()
-//         .and_then(|egl_init| simpleservo::init(opts, egl_init.gl_wrapper, wakeup, callbacks))
-//     {
-//         error!("egl::init() failed with {err:?}");
-//     }
-// }
 
 // #[no_mangle]
 // pub extern "C" fn servo_resize(c_coords: &ServoCoordinates) {
@@ -346,11 +308,11 @@ fn _init() {
 //     debug!("deinit");
 //     simpleservo::deinit();
 // }
-use napi_ohos::{bindgen_prelude::Undefined, JsObject, JsUnknown, NapiRaw, NapiValue, sys::{napi_define_properties, napi_property_descriptor, napi_throw_error}};
-use napi_derive_ohos::{module_exports, napi_no_register};
+use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_define_properties, napi_property_descriptor, napi_throw_error}, JsObject, JsUnknown, NapiRaw, NapiValue};
+use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::sys::napi_unwrap;
 
-#[napi_no_register]
+#[napi]
 pub fn load_url(url: String) -> Undefined {
     debug!("load url");
     call(ServoAction::LoadUrl(url)).expect("Failed to load url");

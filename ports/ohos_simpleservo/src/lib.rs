@@ -347,10 +347,10 @@ fn _init() {
 //     simpleservo::deinit();
 // }
 use napi_ohos::{bindgen_prelude::Undefined, JsObject, JsUnknown, NapiRaw, NapiValue, sys::{napi_define_properties, napi_property_descriptor, napi_throw_error}};
-use napi_derive_ohos::{module_exports, napi};
+use napi_derive_ohos::{module_exports, napi_no_register};
 use napi_ohos::sys::napi_unwrap;
 
-#[napi(js_name = "loadURL")]
+#[napi_no_register]
 pub fn load_url(url: String) -> Undefined {
     debug!("load url");
     call(ServoAction::LoadUrl(url)).expect("Failed to load url");

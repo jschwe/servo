@@ -16,6 +16,8 @@ bench = false
 [dependencies]
 # Todo: Evaluate how official this crate is.
 ohos_hilog = "0.1.2"
+napi-derive-ohos = "0.0.9"
+napi-ohos = "0.1"
 getopts = { workspace = true }
 ipc-channel = { workspace = true }
 libc = { workspace = true }

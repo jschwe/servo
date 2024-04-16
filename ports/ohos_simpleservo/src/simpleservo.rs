@@ -309,7 +309,8 @@ pub fn init(
         host_callbacks: callbacks,
         // todo: .....
         coordinates:  RefCell::new(Coordinates::new(0,0,width,height,width,height)), // RefCell::new(init_opts.coordinates),
-        density: 1.0, // init_opts.density,
+        // Read from typescript: import display from @ohos.display \n displayClass.densityDP
+        density: 3.5, // init_opts.density,
         rendering_context: rendering_context.clone(),
     });
 

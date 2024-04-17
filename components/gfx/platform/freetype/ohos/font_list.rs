@@ -56,11 +56,7 @@ impl FontList {
     fn fallback_font_families() -> Vec<FontFamily> {
         let alternatives = [
             ("sans-serif", "HarmonyOS_Sans_SC_Regular.ttf"),
-            // ("Droid Sans", "DroidSans.ttf"),
-            // (
-            //     "Lomino",
-            //     "/system/etc/ml/kali/Fonts/Lomino/Medium/LominoUI_Md.ttf",
-            // ),
+            ("HarmonyOS Sans", "HarmonyOS_Sans_SC_Regular.ttf"),
         ];
 
         alternatives
@@ -164,10 +160,6 @@ pub fn for_each_variation<F>(family_name: &str, mut callback: F)
     }
 }
 
-// TODO: Font config file available at /system/fonts/visibility_list.json, but unsure if we
-// can access it from inside our sandbox!
-// File also seems to be missing on my system....
-
 pub fn system_default_family(generic_name: &str) -> Option<String> {
     if let Some(family) = FONT_LIST.find_family(&generic_name) {
         Some(family.name.clone())
@@ -227,8 +219,8 @@ pub fn fallback_font_families(codepoint: Option<char>) -> Vec<&'static str> {
         }
     }
 
-    families.push("HarmonyOS Sans SC Regular");
+    families.push("HarmonyOS Sans");
     families
 }
 
-pub static SANS_SERIF_FONT_FAMILY: &'static str = "sans-serif";
+pub static SANS_SERIF_FONT_FAMILY: &'static str = "HarmonyOS Sans";

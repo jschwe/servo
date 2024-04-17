@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-#![allow(bare_trait_objects)] // Until https://github.com/brendanzab/gl-rs/pull/493
-                              //
 pub type ServoGl = std::rc::Rc<dyn servo::gl::Gl>;
 
 // TODO: USe https://gitee.com/openharmony/docs/blob/OpenHarmony-4.0-Release/en/application-dev/napi/xcomponent-guidelines.md

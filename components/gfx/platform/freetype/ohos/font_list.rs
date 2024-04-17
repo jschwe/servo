@@ -55,7 +55,7 @@ impl FontList {
     // Only used in the unlikely case where no font xml mapping files are found.
     fn fallback_font_families() -> Vec<FontFamily> {
         let alternatives = [
-            ("sans-serif", "HarmonyOS_Sans_Regular.ttf"),
+            ("sans-serif", "HarmonyOS_Sans_SC_Regular.ttf"),
             // ("Droid Sans", "DroidSans.ttf"),
             // (
             //     "Lomino",
@@ -164,6 +164,10 @@ pub fn for_each_variation<F>(family_name: &str, mut callback: F)
     }
 }
 
+// TODO: Font config file available at /system/fonts/visibility_list.json, but unsure if we
+// can access it from inside our sandbox!
+// File also seems to be missing on my system....
+
 pub fn system_default_family(generic_name: &str) -> Option<String> {
     if let Some(family) = FONT_LIST.find_family(&generic_name) {
         Some(family.name.clone())
@@ -180,55 +184,50 @@ pub fn fallback_font_families(codepoint: Option<char>) -> Vec<&'static str> {
     let mut families = vec![];
 
     if let Some(block) = codepoint.and_then(|c| c.block()) {
-        // Todo: How does this map to filenames? Mostly likely all strings below
-        //   need to be changed!
         match block {
-            UnicodeBlock::Armenian => {
-                families.push("Droid Sans Armenian");
-            },
+            // UnicodeBlock::Armenian => {
+            //     families.push("Droid Sans Armenian");
+            // },
 
             UnicodeBlock::Hebrew => {
-                families.push("Droid Sans Hebrew");
+                families.push("Noto Sans Hebrew");
             },
 
             UnicodeBlock::Arabic => {
-                families.push("Droid Sans Arabic");
+                families.push("HarmonyOS Sans Naskh Arabic");
             },
 
             UnicodeBlock::Devanagari => {
                 families.push("Noto Sans Devanagari");
-                families.push("Droid Sans Devanagari");
             },
 
             UnicodeBlock::Tamil => {
                 families.push("Noto Sans Tamil");
-                families.push("Droid Sans Tamil");
             },
 
             UnicodeBlock::Thai => {
                 families.push("Noto Sans Thai");
-                families.push("Droid Sans Thai");
             },
 
             UnicodeBlock::Georgian | UnicodeBlock::GeorgianSupplement => {
-                families.push("Droid Sans Georgian");
+                families.push("Noto Sans Georgian");
             },
 
             UnicodeBlock::Ethiopic | UnicodeBlock::EthiopicSupplement => {
-                families.push("Droid Sans Ethiopic");
+                families.push("Noto Sans Ethiopic");
             },
 
             _ => {
                 if is_cjk(codepoint.unwrap()) {
                     families.push("MotoyaLMaru");
-                    families.push("Noto Sans CJK JP");
-                    families.push("Droid Sans Japanese");
+                    families.push("Noto Sans JP");
+                    families.push("Noto Sans KR");
                 }
             },
         }
     }
 
-    families.push("Droid Sans Fallback");
+    families.push("HarmonyOS Sans SC Regular");
     families
 }
 

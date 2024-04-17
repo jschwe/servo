@@ -269,7 +269,6 @@ extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value
             }
             else {
                 info!("Registerd callbacks successfully");
-                XCOMPONENT_REGISTERED.fetch_add(1, std::sync::atomic::Ordering::Release);
             }
             }
         else {

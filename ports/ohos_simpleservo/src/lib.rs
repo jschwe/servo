@@ -354,7 +354,7 @@ fn _init() {
 //     debug!("deinit");
 //     simpleservo::deinit();
 // }
-use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_property_descriptor, napi_throw_error}, JsObject, JsUnknown, NapiRaw, NapiValue};
+use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_property_descriptor, napi_throw_error}};
 use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::sys::napi_unwrap;
 

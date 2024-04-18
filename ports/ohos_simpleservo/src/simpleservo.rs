@@ -1,9 +1,9 @@
 // /* This Source Code Form is subject to the terms of the Mozilla Public
 //  * License, v. 2.0. If a copy of the MPL was not distributed with this
 //  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::mem;
 use std::os::raw::c_void;
 use std::path::PathBuf;
@@ -12,6 +12,10 @@ use std::rc::Rc;
 use getopts::Options;
 use ipc_channel::ipc::IpcSender;
 use log::{debug, info, warn};
+use ohos_sys::ace::xcomponent::native_interface_xcomponent::{
+    OH_NativeXComponent, OH_NativeXComponent_GetXComponentOffset,
+    OH_NativeXComponent_GetXComponentSize,
+};
 use servo::compositing::windowing::{
     AnimationState, EmbedderCoordinates, EmbedderEvent, EmbedderMethods, MouseWindowEvent,
     WindowMethods,
@@ -40,7 +44,6 @@ use servo::webrender_api::units::DevicePixel;
 use servo::webrender_api::ScrollLocation;
 use servo::{self, gl, Servo, TopLevelBrowsingContextId};
 use surfman::{Connection, SurfaceType};
-use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NativeXComponent_GetXComponentSize, OH_NativeXComponent, OH_NativeXComponent_GetXComponentOffset};
 
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
@@ -247,7 +250,9 @@ pub fn init(
     info!("Entered simpleservo init function");
     resources::set(Box::new(ResourceReaderInstance::new()));
 
-    let pref_url = ServoUrl::parse("https://servo.org/").ok();
+    // file:///data/storage/el1/base/haps/entry/files/index.html
+    // https://m.vmall.com/index.html
+    let pref_url = ServoUrl::parse("https://servo.org").ok();
     let blank_url = ServoUrl::parse("about:blank").ok();
 
     let url = pref_url.or(blank_url).unwrap();
@@ -258,7 +263,6 @@ pub fn init(
     gl.finish();
     info!("gl.finish()");
 
-
     // Initialize surfman
     let connection = Connection::new().or(Err("Failed to create connection"))?;
     let adapter = connection
@@ -267,38 +271,40 @@ pub fn init(
 
     let mut width: u64 = 0;
     let mut height: u64 = 0;
-    let res = unsafe { OH_NativeXComponent_GetXComponentSize(xcomponent, native_window,
-        &mut width as *mut _,
-        &mut height as *mut _) };
+    let res = unsafe {
+        OH_NativeXComponent_GetXComponentSize(
+            xcomponent,
+            native_window,
+            &mut width as *mut _,
+            &mut height as *mut _,
+        )
+    };
     assert_eq!(res, 0, "OH_NativeXComponent_GetXComponentSize failed");
     let width: i32 = width.try_into().expect("Width to large");
     let height: i32 = height.try_into().expect("Height to large");
-    info!("Creating surfman widget with width {width} and height {height}");
-    use std::convert::TryInto;
+    //
+    // let mut offsetX: f64 = 0.0;
+    // let mut offsetY: f64 = 0.0;
+    // // Obtain the offset of the surface held by the <XComponent> relative to the upper left corner of the window.
+    // unsafe {
+    //     let _ = OH_NativeXComponent_GetXComponentOffset(
+    //         xcomponent,
+    //         native_window,
+    //         &mut offsetX as *mut _,
+    //         &mut offsetY as *mut _,
+    //     );
+    // }
+    // info!("OH_NativeXComponent_GetXComponentOffset offsetX = {offsetX}, offsetY = {offsetY}");
+    //
+    // info!("Creating surfman widget with width {width} and height {height}");
     let native_widget = unsafe {
-                    connection.create_native_widget_from_ptr_ohos(
-                        xcomponent as *mut _,
-                        native_window,
-                        Size2D::new(width,
-                             height),
-                    )
-                };
+        connection.create_native_widget_from_ptr(
+            native_window,
+            Size2D::new(width, height),
+        )
+    };
     let surface_type = SurfaceType::Widget { native_widget };
-    // let surface_type = match init_opts.surfman_integration {
-    //     SurfmanIntegration::Widget(native_widget) => {
-    //         let native_widget = unsafe {
-    //             connection.create_native_widget_from_ptr(
-    //                 native_widget,
-    //                 init_opts.coordinates.framebuffer.to_untyped(),
-    //             )
-    //         };
-    //         SurfaceType::Widget { native_widget }
-    //     },
-    //     SurfmanIntegration::Surface => {
-    //         let size = init_opts.coordinates.framebuffer.to_untyped();
-    //         SurfaceType::Generic { size }
-    //     },
-    // };
+
     info!("Creating rendering context");
     let rendering_context = RenderingContext::create(&connection, &adapter, surface_type)
         .or(Err("Failed to create surface manager"))?;
@@ -308,7 +314,7 @@ pub fn init(
     let window_callbacks = Rc::new(ServoWindowCallbacks {
         host_callbacks: callbacks,
         // todo: .....
-        coordinates:  RefCell::new(Coordinates::new(0,0,width,height,width,height)), // RefCell::new(init_opts.coordinates),
+        coordinates: RefCell::new(Coordinates::new(0, 0, width, height, width, height)), // RefCell::new(init_opts.coordinates),
         // Read from typescript: import display from @ohos.display \n displayClass.densityDP
         density: 3.5, // init_opts.density,
         rendering_context: rendering_context.clone(),
@@ -327,7 +333,6 @@ pub fn init(
         CompositeTarget::Window,
     );
 
-
     let mut servo_glue = ServoGlue {
         rendering_context,
         servo: servo.servo,
@@ -343,7 +348,6 @@ pub fn init(
 
     Ok(servo_glue)
 }
-
 
 impl ServoGlue {
     fn get_browser_id(&self) -> Result<TopLevelBrowsingContextId, &'static str> {
@@ -647,6 +651,7 @@ impl ServoGlue {
     }
 
     fn process_event(&mut self, event: EmbedderEvent) -> Result<(), &'static str> {
+        info!("process event called!");
         self.events.push(event);
         if !self.batch_mode {
             self.perform_updates()
@@ -838,17 +843,17 @@ impl ServoGlue {
                 EmbedderMsg::ReadyToPresent => {
                     need_present = true;
                 },
-                EmbedderMsg::Status(..) |
-                EmbedderMsg::SelectFiles(..) |
-                EmbedderMsg::MoveTo(..) |
-                EmbedderMsg::ResizeTo(..) |
-                EmbedderMsg::Keyboard(..) |
-                EmbedderMsg::SetCursor(..) |
-                EmbedderMsg::NewFavicon(..) |
-                EmbedderMsg::HeadParsed |
-                EmbedderMsg::SetFullscreenState(..) |
-                EmbedderMsg::ReportProfile(..) |
-                EmbedderMsg::EventDelivered(..) => {},
+                EmbedderMsg::Status(..)
+                | EmbedderMsg::SelectFiles(..)
+                | EmbedderMsg::MoveTo(..)
+                | EmbedderMsg::ResizeTo(..)
+                | EmbedderMsg::Keyboard(..)
+                | EmbedderMsg::SetCursor(..)
+                | EmbedderMsg::NewFavicon(..)
+                | EmbedderMsg::HeadParsed
+                | EmbedderMsg::SetFullscreenState(..)
+                | EmbedderMsg::ReportProfile(..)
+                | EmbedderMsg::EventDelivered(..) => {},
             }
         }
 

@@ -90,6 +90,7 @@ use url::Url;
 use webrender_api::units::LayoutPixel;
 use webrender_api::{units, ExternalScrollId, HitTestFlags};
 use webrender_traits::WebRenderScriptApi;
+use hitrace_macro::trace_fn;
 
 /// Information needed by layout.
 pub struct LayoutThread {
@@ -240,6 +241,7 @@ impl Layout for LayoutThread {
         );
     }
 
+    #[trace_fn]
     fn add_stylesheet(
         &mut self,
         stylesheet: ServoArc<Stylesheet>,
@@ -259,6 +261,7 @@ impl Layout for LayoutThread {
         }
     }
 
+    #[trace_fn]
     fn remove_stylesheet(&mut self, stylesheet: ServoArc<Stylesheet>) {
         let guard = stylesheet.shared_lock.read();
         let stylesheet = DocumentStyleSheet(stylesheet.clone());
@@ -267,18 +270,21 @@ impl Layout for LayoutThread {
             .remove_all_web_fonts_from_stylesheet(&stylesheet);
     }
 
+    #[trace_fn]
     fn query_content_box(&self, node: OpaqueNode) -> Option<UntypedRect<Au>> {
         process_content_box_request(node, self.fragment_tree.borrow().clone())
     }
 
+    #[trace_fn]
     fn query_content_boxes(&self, node: OpaqueNode) -> Vec<UntypedRect<Au>> {
         process_content_boxes_request(node, self.fragment_tree.borrow().clone())
     }
 
+    #[trace_fn]
     fn query_client_rect(&self, node: OpaqueNode) -> UntypedRect<i32> {
         process_node_geometry_request(node, self.fragment_tree.borrow().clone())
     }
-
+    #[trace_fn]
     fn query_element_inner_text(
         &self,
         node: script_layout_interface::TrustedNodeAddress,
@@ -295,7 +301,7 @@ impl Layout for LayoutThread {
         //            builder in order to support query iframe sizing.
         None
     }
-
+    #[trace_fn]
     fn query_nodes_from_point(
         &self,
         point: UntypedPoint2D<f32>,
@@ -317,11 +323,11 @@ impl Layout for LayoutThread {
 
         results.iter().map(|result| result.node.into()).collect()
     }
-
+    #[trace_fn]
     fn query_offset_parent(&self, node: OpaqueNode) -> OffsetParentResponse {
         process_offset_parent_query(node, self.fragment_tree.borrow().clone())
     }
-
+    #[trace_fn]
     fn query_resolved_style(
         &self,
         node: TrustedNodeAddress,
@@ -356,7 +362,7 @@ impl Layout for LayoutThread {
             fragment_tree,
         )
     }
-
+    #[trace_fn]
     fn query_resolved_font_style(
         &self,
         node: TrustedNodeAddress,
@@ -389,10 +395,11 @@ impl Layout for LayoutThread {
         )
     }
 
+    #[trace_fn]
     fn query_scrolling_area(&self, node: Option<OpaqueNode>) -> UntypedRect<i32> {
         process_node_scroll_area_request(node, self.fragment_tree.borrow().clone())
     }
-
+    #[trace_fn]
     fn query_text_indext(
         &self,
         node: OpaqueNode,
@@ -468,6 +475,7 @@ impl Layout for LayoutThread {
 }
 
 impl LayoutThread {
+    #[trace_fn]
     fn new(
         id: PipelineId,
         url: ServoUrl,

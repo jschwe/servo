@@ -42,3 +42,6 @@ style_traits = { workspace = true }
 url = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
+
+hitrace = { workspace = true}
+hitrace-macro = { workspace = true}

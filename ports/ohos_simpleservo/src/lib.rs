@@ -31,6 +31,7 @@ use ohos_hilog::{Config, FilterBuilder};
 #[link(name = "ace_napi.z")]
 #[link(name = "ace_ndk.z")]
 #[link(name = "hilog_ndk.z")]
+#[link(name = "native_window")]
 #[link(name = "clang_rt.builtins", kind = "static")]
 extern "C" {}
 

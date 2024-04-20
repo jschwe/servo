@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.check.overrideCommand": [
+        "./mach", "check", "--message-format=json" ],
+    "rust-analyzer.cargo.buildScripts.overrideCommand": [
+        "./mach", "check", "--message-format=json" ],
+    "rust-analyzer.rustfmt.overrideCommand": [ "./mach", "fmt" ],
+    "rust-analyzer.check.targets": ["aarch64-unknown-linux-ohos"]
+}

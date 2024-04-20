@@ -52,8 +52,8 @@ harfbuzz-sys = { git = "https://github.com/servo/rust-harfbuzz.git"}
 surfman = { git = "https://github.com/jschwe/surfman" , branch = "jschwender/ohosv2" }
 webxr = { git = "https://github.com/servo/webxr.git" }
 
-# Status: No MR yet.
-font-kit  = { git = "https://github.com/jschwe/font-kit" , branch = "jschwender/main_ohos" }
+# Waiting on new release
+font-kit  = { git = "https://github.com/servo/font-kit" , branch = "main" }
 
 # font-kit = { path = "/home/jschwender/Dev/font-kit"}
 

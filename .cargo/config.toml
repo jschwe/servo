@@ -32,16 +32,13 @@ linker = "lld-link.exe"
 ar = "/home/jschwender/tools/ohos-sdk/linux/native-linux-x64-4.0.10.13-Release/native/llvm/bin/llvm-ar"
 linker = "aarch64-unknown-linux-ohos-clang.sh"
 
-[unstable]
-build-std = ["core", "alloc", "std"]
-
 [env]
 MACOSX_DEPLOYMENT_TARGET = "10.10"
 RUSTC_BOOTSTRAP = "1"
 
 [build]
 rustdocflags = ["--document-private-items"]
-rustc = "crown"
+# rustc = "crown"
 
 [patch.crates-io]
 napi-derive-ohos = { git = "https://github.com/jschwe/ohos-rs.git", branch = "jschwender/ohos" }

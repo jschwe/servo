@@ -146,6 +146,9 @@ inherits = "release"
 debug-assertions = false
 
 [patch.crates-io]
+surfman = { git = "https://github.com/jschwe/surfman", branch = "jschwender/ohos_for_upstream" }
+font-kit = { git = "https://github.com/servo/font-kit", branch = "main" }
+
 # If you need to temporarily test Servo with a local fork of some upstream
 # crate, add that here. Use the form:
 #

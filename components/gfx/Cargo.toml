@@ -20,7 +20,7 @@ euclid = { workspace = true }
 fnv = { workspace = true }
 fontsan = { git = "https://github.com/servo/fontsan" }
 gfx_traits = { workspace = true }
-harfbuzz-sys = {  version = "0.6.0" }
+harfbuzz-sys = {  version = "0.6.1" }
 ipc-channel = { workspace = true }
 lazy_static = { workspace = true }
 libc = { workspace = true }
@@ -59,7 +59,7 @@ fontconfig_sys = { package = "yeslogic-fontconfig-sys", version = "5" }
 xml-rs = "0.8"
 
 [target.'cfg(target_env = "ohos")'.dependencies]
-harfbuzz-sys = { version = "0.6.0", features = ["bundled"]}
+harfbuzz-sys = { version = "0.6.1", features = ["bundled"]}
 
 
 [target.'cfg(target_os = "windows")'.dependencies]

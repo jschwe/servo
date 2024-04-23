@@ -46,7 +46,6 @@ raw-window-handle = { git = "https://github.com/jschwe/raw-window-handle" , bran
 # https://github.com/servo/rust-freetype/pull/72
 freetype = { git = "https://github.com/jschwe/rust-freetype", branch = "jschwender/ohos" }
 # raw-window-handle = { path = "/home/jschwender/Dev/raw-window-handle" }
-harfbuzz-sys = { git = "https://github.com/servo/rust-harfbuzz.git"}
 # Status: Surfman is still being hacked on!
 # surfman = { path = "/home/jschwender/Dev/surfman/surfman" }
 surfman = { git = "https://github.com/jschwe/surfman" , branch = "jschwender/ohosv2" }

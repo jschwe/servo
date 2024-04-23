@@ -43,8 +43,6 @@ rustdocflags = ["--document-private-items"]
 [patch.crates-io]
 napi-derive-ohos = { git = "https://github.com/jschwe/ohos-rs.git", branch = "jschwender/ohos" }
 raw-window-handle = { git = "https://github.com/jschwe/raw-window-handle" , branch = "jschwender/ohos" }
-# https://github.com/servo/rust-freetype/pull/72
-freetype = { git = "https://github.com/jschwe/rust-freetype", branch = "jschwender/ohos" }
 # raw-window-handle = { path = "/home/jschwender/Dev/raw-window-handle" }
 # Status: Surfman is still being hacked on!
 # surfman = { path = "/home/jschwender/Dev/surfman/surfman" }

@@ -19,7 +19,6 @@ ohos_hilog = "0.1.2"
 napi-derive-ohos = "0.0.9"
 napi-ohos = "0.1"
 getopts = { workspace = true }
-ipc-channel = { workspace = true }
 libc = { workspace = true }
 # libloading = "0.8"
 libservo = { path = "../../components/servo" }
@@ -33,6 +32,7 @@ ctor = "0.2.7"
 [target.'cfg(all(target_os = "linux", target_env = "ohos"))'.dependencies]
 ohos_hilog = "0.1"
 ohos-sys = { git = "https://github.com/jschwe/ohos-sys.git" }
+ipc-channel = { workspace = true, features = ["force-inprocess"] }
 
 [build-dependencies]
 cc = "1.0"
@@ -42,7 +42,5 @@ vergen = { version = "8.0.0", features = ["git", "gitcl"] }
 
 [features]
 debugmozjs = ["libservo/debugmozjs"]
-# TODO: Once the native-bluetooth feature works for
-# Android, re-add it here.
 default = ["max_log_level"]
 max_log_level = ["log/release_max_level_info"]

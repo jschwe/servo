@@ -18,6 +18,9 @@ libservo = { path = "../../components/servo" }
 libc = { workspace = true }
 log = { workspace = true }
 
+[target.'cfg(all(target_os = "linux", target_env = "ohos"))'.dependencies]
+ipc-channel = { workspace = true, features = ["force-inprocess"] }
+
 [build-dependencies]
 cc = "1.0"
 gl_generator = "0.14"

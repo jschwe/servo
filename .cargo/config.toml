@@ -50,7 +50,7 @@ raw-window-handle = { git = "https://github.com/jschwe/raw-window-handle" , bran
 harfbuzz-sys = { git = "https://github.com/servo/rust-harfbuzz.git"}
 # Status: Surfman is still being hacked on!
 # surfman = { path = "/home/jschwender/Dev/surfman/surfman" }
-surfman = { git = "https://github.com/jschwe/surfman" , branch = "jschwender/ohos" }
+surfman = { git = "https://github.com/jschwe/surfman" , branch = "jschwender/ohosv2" }
 webxr = { git = "https://github.com/servo/webxr.git" }
 
 # Status: No MR yet.

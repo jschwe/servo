@@ -775,10 +775,8 @@ class CommandBase(object):
         env[f'PKG_CONFIG_PATH_{rust_target_triple}'] = pkg_config_path
 
         # bindgen / libclang-sys
-        cxx_include_dir = str(llvm_toolchain.joinpath("include", "libcxx-ohos", "include", "c++", "v1"))
         env["LIBCLANG_PATH"] = path.join(llvm_toolchain, "lib")
-        env["CLANG_PATH"] = to_sdk_llvm_bin("clang")
-        env[f'BINDGEN_EXTRA_CLANG_ARGS_{rust_target_triple}'] = f"--sysroot={ohos_sysroot} -I{cxx_include_dir}"
+        env["CLANG_PATH"] = cross_clang_wrapper
         env[f'CXXSTDLIB_{clang_target_triple}'] = "c++"
 
     @staticmethod

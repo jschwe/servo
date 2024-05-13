@@ -28,6 +28,7 @@ servo-media = { git = "https://github.com/servo/media" }
 surfman = { workspace = true, features = ["sm-angle-default"] }
 webxr = { git = "https://github.com/servo/webxr" }
 ctor = "0.2.7"
+backtrace = "0.3.71"
 
 [target.'cfg(all(target_os = "linux", target_env = "ohos"))'.dependencies]
 ohos_hilog = "0.1"
@@ -43,4 +44,4 @@ vergen = { version = "8.0.0", features = ["git", "gitcl"] }
 [features]
 debugmozjs = ["libservo/debugmozjs"]
 default = ["max_log_level"]
-max_log_level = ["log/release_max_level_info"]
+max_log_level = ["log/release_max_level_info", "log/max_level_info"]

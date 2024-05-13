@@ -6,9 +6,7 @@
 mod gl_glue;
 mod simpleservo;
 
-use std::{
-    collections::HashMap, ffi::{CStr, CString}, mem::MaybeUninit, os::raw::{c_char, c_void}, sync::{atomic::AtomicUsize, Once, OnceLock}, time::Duration
-};
+use std::{collections::HashMap, env, ffi::{CStr, CString}, mem::MaybeUninit, os::raw::{c_char, c_void}, sync::{atomic::AtomicUsize, Once, OnceLock}, time::Duration};
 use std::sync::mpsc;
 use std::thread;
 use ctor::ctor;
@@ -27,6 +25,8 @@ use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_
 extern crate log;
 use log::LevelFilter;
 use ohos_hilog::{Config, FilterBuilder};
+
+mod backtrace;
 
 #[link(name = "ace_napi.z")]
 #[link(name = "ace_ndk.z")]
@@ -223,6 +223,36 @@ fn initialize_logging_once() {
         std::panic::set_hook(Box::new(|info| {
             error!("Panic in Rust code");
             error!("PanicInfo: {info}");
+            let msg = match info.payload().downcast_ref::<&'static str>() {
+                Some(s) => *s,
+                None => match info.payload().downcast_ref::<String>() {
+                    Some(s) => &**s,
+                    None => "Box<Any>",
+                },
+            };
+            let current_thread = thread::current();
+            let name = current_thread.name().unwrap_or("<unnamed>");
+            let stderr = std::io::stderr();
+            let mut stderr = stderr.lock();
+            if let Some(location) = info.location() {
+                let _ = error!("{} (thread {}, at {}:{})",
+                    msg,
+                    name,
+                    location.file(),
+                    location.line()
+                );
+            } else {
+                let _ = error!("{} (thread {})", msg, name);
+            }
+
+            let _ = crate::backtrace::print();
+            drop(stderr);
+
+            // if opts::get().hard_fail && !opts::get().multiprocess {
+            //     std::process::exit(1);
+            // }
+
+            error!("{}", msg);
         }));
     })
 }
@@ -358,6 +388,7 @@ fn _init() {
 use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_property_descriptor, napi_throw_error}};
 use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::sys::napi_unwrap;
+use servo::config::opts;
 
 #[napi]
 pub fn load_url(url: String) -> Undefined {

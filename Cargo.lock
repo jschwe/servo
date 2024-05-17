@@ -301,7 +301,7 @@ dependencies = [
  "log",
  "mach2",
  "msg",
- "nix 0.27.1",
+ "nix",
  "serde_json",
  "unwind-sys",
 ]
@@ -897,6 +897,8 @@ dependencies = [
  "gaol",
  "gfx",
  "gfx_traits",
+ "hitrace",
+ "hitrace-macro",
  "http",
  "ipc-channel",
  "keyboard-types",
@@ -936,6 +938,15 @@ dependencies = [
  "serde",
  "sha2",
  "url",
+]
+
+[[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -1127,6 +1138,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edb49164822f3ee45b17acd4a208cfc1251410cf0cad9a833234c9890774dd9f"
+dependencies = [
+ "quote",
+ "syn 2.0.63",
+]
+
+[[package]]
 name = "cursor-icon"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1139,7 +1160,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28bfe653d79bd16c77f659305b195b82bb5ce0c0eb2a4846b82ddbd77586813"
 dependencies = [
  "bitflags 2.5.0",
- "libloading 0.7.4",
+ "libloading 0.8.3",
  "winapi",
 ]
 
@@ -1346,7 +1367,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading 0.7.4",
+ "libloading 0.8.3",
 ]
 
 [[package]]
@@ -2072,7 +2093,7 @@ dependencies = [
  "libc",
  "libudev-sys",
  "log",
- "nix 0.28.0",
+ "nix",
  "uuid",
  "vec_map",
  "wasm-bindgen",
@@ -2682,6 +2703,32 @@ name = "histogram"
 version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12cb882ccb290b8646e554b157ab0b71e64e8d5bef775cd66b6531e52d302669"
+
+[[package]]
+name = "hitrace"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f92c0ae6f30b32eaeb811143fba3b56864f477b2e69458b13779a07b3aaf2f6e"
+dependencies = [
+ "hitrace-sys",
+]
+
+[[package]]
+name = "hitrace-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01fe83b1165512183663ad0411ed66a5f52b473c5b5795d4a5fef0258882d3d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.63",
+]
+
+[[package]]
+name = "hitrace-sys"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d504fd3e58588dfe3f8cb5d90e79239b504f725066f6b47cd29922d372b1c3a"
 
 [[package]]
 name = "home"
@@ -3323,6 +3370,8 @@ dependencies = [
  "fxhash",
  "gfx",
  "gfx_traits",
+ "hitrace",
+ "hitrace-macro",
  "ipc-channel",
  "layout_2020",
  "lazy_static",
@@ -3922,6 +3971,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "napi-derive-backend-ohos"
+version = "0.0.7"
+source = "git+https://github.com/jschwe/ohos-rs.git?branch=jschwender/ohos#14bf41ddd028b1fa173739c0de687b937618dd32"
+dependencies = [
+ "convert_case",
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.63",
+]
+
+[[package]]
+name = "napi-derive-ohos"
+version = "0.0.9"
+source = "git+https://github.com/jschwe/ohos-rs.git?branch=jschwender/ohos#14bf41ddd028b1fa173739c0de687b937618dd32"
+dependencies = [
+ "cfg-if",
+ "convert_case",
+ "napi-derive-backend-ohos",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.63",
+]
+
+[[package]]
+name = "napi-ohos"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad5a3bbb2ae61f345b8c11776f2e79fc2bb71d1901af9a5f81f03c9238a05d86"
+dependencies = [
+ "bitflags 2.5.0",
+ "ctor",
+ "napi-sys-ohos",
+ "once_cell",
+]
+
+[[package]]
+name = "napi-sys-ohos"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f101404db01422d034db5afa63eefff6d9c8f66c0894278bc456b4c30954e166"
+dependencies = [
+ "libloading 0.8.3",
+]
+
+[[package]]
 name = "ndk"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4047,17 +4143,6 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
-
-[[package]]
-name = "nix"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
-dependencies = [
- "bitflags 2.5.0",
- "cfg-if",
- "libc",
-]
 
 [[package]]
 name = "nix"
@@ -4258,6 +4343,29 @@ checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "ohos-sys"
+version = "0.1.0"
+source = "git+https://github.com/jschwe/ohos-sys.git#bf0625fc7ea8035c2991626fb0a593e06c9c8c21"
+
+[[package]]
+name = "ohos_hilog"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f19159fff850236e28de65ea21dffdfe317db3a92a18119aa3fc68dddd890f4"
+dependencies = [
+ "env_logger 0.10.2",
+ "log",
+ "ohos_hilog-sys",
+ "once_cell",
+]
+
+[[package]]
+name = "ohos_hilog-sys"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb48d79d06b57f900f4e4a494f4563fbf130043986781a8f153e0b45ac99e71b"
 
 [[package]]
 name = "once_cell"
@@ -4759,9 +4867,8 @@ dependencies = [
 
 [[package]]
 name = "raw-window-handle"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42a9830a0e1b9fb145ebb365b8bc4ccd75f290f98c0247deafbbe2c75cefb544"
+version = "0.6.1"
+source = "git+https://github.com/rust-windowing/raw-window-handle#d0aa91c67d16a88f4597e8e17bebc2b3d4afb0e7"
 
 [[package]]
 name = "rayon"
@@ -5702,6 +5809,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "simpleservo_napi"
+version = "0.0.1"
+dependencies = [
+ "backtrace",
+ "cc",
+ "ctor",
+ "getopts",
+ "gl_generator",
+ "ipc-channel",
+ "libc",
+ "libservo",
+ "log",
+ "napi-derive-ohos",
+ "napi-ohos",
+ "ohos-sys",
+ "ohos_hilog",
+ "serde_json",
+ "servo-media",
+ "surfman",
+ "vergen",
+ "webxr",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6009,8 +6140,7 @@ dependencies = [
 [[package]]
 name = "surfman"
 version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d43b99fd15373be8ef0ab83114da9e40d37211f99846b292d72543c4bd3d58d6"
+source = "git+https://github.com/jschwe/surfman?branch=jschwender/ohosv2#bf97ba61e7fe44f3023d86e42ec3a9b2ef6a6301"
 dependencies = [
  "bitflags 1.3.2",
  "cfg_aliases",
@@ -6028,6 +6158,7 @@ dependencies = [
  "mach2",
  "metal 0.24.0",
  "objc",
+ "ohos-sys",
  "raw-window-handle",
  "servo-display-link",
  "sparkle",
@@ -7248,7 +7379,7 @@ dependencies = [
  "js-sys",
  "khronos-egl",
  "libc",
- "libloading 0.7.4",
+ "libloading 0.8.3",
  "log",
  "metal 0.28.0",
  "naga",

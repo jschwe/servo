@@ -19,6 +19,9 @@ use net_traits::{
     CoreResourceMsg, FetchChannels, FetchMetadata, FetchResponseMsg, IpcSend, NetworkError,
     ResourceThreads,
 };
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
 
 pub struct NetworkListener {
     res_init: Option<ResponseInit>,
@@ -46,6 +49,7 @@ impl NetworkListener {
         }
     }
 
+    #[trace_fn]
     pub fn initiate_fetch(&self, cancel_chan: Option<ipc::IpcReceiver<()>>) {
         let (ipc_sender, ipc_receiver) = ipc::channel().expect("Failed to create IPC channel!");
 

@@ -48,6 +48,8 @@ url = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 xi-unicode = { workspace = true }
+hitrace = { version = "0.1.3" }
+hitrace-macro = { version = "0.1"}
 
 [target.'cfg(target_os = "macos")'.dependencies]
 byteorder = { workspace = true }

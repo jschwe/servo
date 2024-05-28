@@ -67,6 +67,8 @@ uuid = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 webpki-roots = { workspace = true }
+hitrace = { version = "0.1.3" }
+hitrace-macro = { version = "0.1"}
 
 [dev-dependencies]
 futures = { version = "0.3", features = ["compat"] }

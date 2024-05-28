@@ -119,6 +119,8 @@ webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 webxr-api = { git = "https://github.com/servo/webxr", features = ["ipc"] }
 xml5ever = { workspace = true }
+hitrace = { workspace = true}
+hitrace-macro = { workspace = true}
 
 [target.'cfg(not(target_os = "ios"))'.dependencies]
 mozangle = { workspace = true }

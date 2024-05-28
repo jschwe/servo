@@ -171,6 +171,8 @@ use crate::session_history::{
 use crate::timer_scheduler::TimerScheduler;
 use crate::webview::WebViewManager;
 use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
 
 type PendingApprovalNavigations = HashMap<PipelineId, (LoadData, HistoryEntryReplacement)>;
 
@@ -1550,8 +1552,10 @@ where
                 self.set_webview_throttled(webview_id, throttled);
             },
             FromCompositorMsg::ReadyToPresent(webview_ids) => {
+                start_trace(&CString::new("FromCompositorMsg::ReadyToPresent").unwrap());
                 self.embedder_proxy
                     .send((None, EmbedderMsg::ReadyToPresent(webview_ids)));
+                finish_trace();
             },
             FromCompositorMsg::Gamepad(gamepad_event) => {
                 self.handle_gamepad_msg(gamepad_event);

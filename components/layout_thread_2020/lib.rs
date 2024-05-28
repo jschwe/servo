@@ -91,6 +91,8 @@ use webrender_api::units::LayoutPixel;
 use webrender_api::{units, ExternalScrollId, HitTestFlags};
 use webrender_traits::WebRenderScriptApi;
 use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
 
 /// Information needed by layout.
 pub struct LayoutThread {
@@ -626,6 +628,7 @@ impl LayoutThread {
     }
 
     /// The high-level routine that performs layout.
+    #[trace_fn]
     fn handle_reflow(&mut self, data: &mut ScriptReflowResult) {
         let document = unsafe { ServoLayoutNode::new(&data.document) };
         let document = document.as_document().unwrap();
@@ -745,8 +748,10 @@ impl LayoutThread {
         };
 
         if token.should_traverse() {
+            start_trace(&CString::new("driver::traverse_dom").unwrap());
             let dirty_root: ServoLayoutNode =
                 driver::traverse_dom(&traversal, token, rayon_pool).as_node();
+            finish_trace();
 
             let root_node = root_element.as_node();
             let mut box_tree = self.box_tree.borrow_mut();
@@ -756,11 +761,13 @@ impl LayoutThread {
                     *box_tree = Some(Arc::new(BoxTree::construct(traversal.context(), root_node)));
                 }
             };
+            start_trace(&CString::new("build_box_tree").unwrap());
             if let Some(pool) = rayon_pool {
                 pool.install(build_box_tree)
             } else {
                 build_box_tree()
             };
+            finish_trace();
 
             let viewport_size = Size2D::new(
                 self.viewport_size.width.to_f32_px(),
@@ -772,11 +779,13 @@ impl LayoutThread {
                     .unwrap()
                     .layout(traversal.context(), viewport_size)
             };
+            start_trace(&CString::new("run_layout").unwrap());
             let fragment_tree = Arc::new(if let Some(pool) = rayon_pool {
                 pool.install(run_layout)
             } else {
                 run_layout()
             });
+            finish_trace();
             *self.fragment_tree.borrow_mut() = Some(fragment_tree);
         }
 
@@ -835,6 +844,7 @@ impl LayoutThread {
         );
     }
 
+    #[trace_fn]
     fn perform_post_style_recalc_layout_passes(
         &self,
         fragment_tree: Arc<FragmentTree>,

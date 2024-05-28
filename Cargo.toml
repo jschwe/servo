@@ -66,7 +66,7 @@ jemallocator = "0.5.4"
 keyboard-types = "0.7"
 lazy_static = "1.4"
 libc = "0.2"
-log = "0.4"
+log = { version = "0.4", features = ["max_level_error"]}
 malloc_size_of = { git = "https://github.com/servo/stylo", branch = "2024-05-15", features = ["servo"] }
 malloc_size_of_derive = "0.1"
 mime = "0.3.13"
@@ -156,6 +156,9 @@ debug = false
 [profile.dev]
 strip = true
 
+#[patch."https://github.com/servo/webrender"]
+#"webrender" = { path = "../webrender/webrender" }
+#"webrender_api" = { path = "../webrender/webrender_api" }
 
 [patch.crates-io]
 # If you need to temporarily test Servo with a local fork of some upstream

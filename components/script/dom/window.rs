@@ -153,6 +153,10 @@ use crate::timers::{IsInterval, TimerCallback};
 use crate::webdriver_handlers::jsval_to_webdriver;
 use crate::{fetch, window_named_properties};
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 /// Current state of the window object
 #[derive(Clone, Copy, Debug, JSTraceable, MallocSizeOf, PartialEq)]
 enum WindowState {
@@ -1952,6 +1956,7 @@ impl Window {
     /// that layout might hold if the first layout hasn't happened yet (which
     /// may happen in the only case a query reflow may bail out, that is, if the
     /// viewport size is not present). See #11223 for an example of that.
+    #[trace_fn]
     pub fn reflow(&self, reflow_goal: ReflowGoal, reason: ReflowReason) -> bool {
         self.Document().ensure_safe_to_run_script_or_layout();
         let for_display = reflow_goal == ReflowGoal::Full;

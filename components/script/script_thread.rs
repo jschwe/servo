@@ -163,6 +163,9 @@ use crate::task_source::user_interaction::UserInteractionTaskSource;
 use crate::task_source::websocket::WebsocketTaskSource;
 use crate::task_source::{TaskSource, TaskSourceName};
 use crate::{devtools, webdriver_handlers};
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
 
 pub type ImageCacheMsg = (PipelineId, PendingImageResponse);
 
@@ -797,6 +800,7 @@ impl ScriptThreadFactory for ScriptThread {
         thread::Builder::new()
             .name(format!("Script{:?}", state.id))
             .spawn(move || {
+                start_trace(&CString::new("initialize").unwrap());
                 thread_state::initialize(ThreadState::SCRIPT | ThreadState::LAYOUT);
                 PipelineNamespace::install(state.pipeline_namespace_id);
                 TopLevelBrowsingContextId::install(state.top_level_browsing_context_id);
@@ -811,6 +815,7 @@ impl ScriptThreadFactory for ScriptThread {
                 let mem_profiler_chan = state.mem_profiler_chan.clone();
                 let window_size = state.window_size;
 
+                start_trace(&CString::new("ScriptThread::new").unwrap());
                 let script_thread = ScriptThread::new(
                     state,
                     script_port,
@@ -819,6 +824,7 @@ impl ScriptThreadFactory for ScriptThread {
                     font_cache_thread,
                     user_agent,
                 );
+                finish_trace();
 
                 SCRIPT_THREAD_ROOT.with(|root| {
                     root.set(Some(&script_thread as *const _));
@@ -840,6 +846,7 @@ impl ScriptThreadFactory for ScriptThread {
                 );
                 script_thread.pre_page_load(new_load, load_data);
 
+                finish_trace();
                 let reporter_name = format!("script-reporter-{:?}", id);
                 mem_profiler_chan.run_with_memory_reporting(
                     || {
@@ -1272,6 +1279,7 @@ impl ScriptThread {
     }
 
     /// Creates a new script thread.
+    #[trace_fn]
     pub fn new(
         state: InitialScriptState,
         port: Receiver<MainThreadScriptMsg>,
@@ -1286,11 +1294,13 @@ impl ScriptThread {
 
         let boxed_script_sender = Box::new(MainThreadScriptChan(chan.clone()));
 
+        start_trace(&CString::new("new_rt_and_cx").unwrap());
         let runtime = new_rt_and_cx(Some(NetworkingTaskSource(
             boxed_script_sender.clone(),
             state.id,
         )));
         let cx = runtime.cx();
+        finish_trace();
 
         unsafe {
             SetWindowProxyClass(cx, GetWindowProxyClass());
@@ -1751,6 +1761,7 @@ impl ScriptThread {
     }
 
     /// Handle incoming messages from other tasks and the task queue.
+    #[trace_fn]
     fn handle_msgs(&self) -> bool {
         use self::MixedMessage::{
             FromConstellation, FromDevtools, FromImageCache, FromScript, FromWebGPUServer,
@@ -1904,6 +1915,7 @@ impl ScriptThread {
 
         // Process the gathered events.
         debug!("Processing events.");
+        start_trace(&CString::new("Processing event").unwrap());
         for msg in sequential {
             debug!("Processing event {:?}.", msg);
             let category = self.categorize_msg(&msg);
@@ -1956,6 +1968,7 @@ impl ScriptThread {
             // TODO(#32003): A microtask checkpoint is only supposed to be performed after running a task.
             self.perform_a_microtask_checkpoint();
         }
+        finish_trace();
 
         {
             // https://html.spec.whatwg.org/multipage/#the-end step 6
@@ -1973,6 +1986,7 @@ impl ScriptThread {
         // TODO(gw): In the future we could probably batch other types of reflows
         // into this loop too, but for now it's only images.
         debug!("Issuing batched reflows.");
+        start_trace(&CString::new("Issuing batched reflows.").unwrap());
         for (_, document) in self.documents.borrow().iter() {
             // Step 13
             if !document.is_fully_active() {
@@ -1997,6 +2011,7 @@ impl ScriptThread {
                 window.reflow(ReflowGoal::Full, ReflowReason::MissingExplicitReflow);
             }
         }
+        finish_trace();
 
         true
     }
@@ -2213,6 +2228,7 @@ impl ScriptThread {
         value
     }
 
+    #[trace_fn]
     fn handle_msg_from_constellation(&self, msg: ConstellationControlMsg) {
         match msg {
             ConstellationControlMsg::StopDelayingLoadEventsMode(pipeline_id) => {
@@ -2360,6 +2376,7 @@ impl ScriptThread {
         }
     }
 
+    #[trace_fn]
     fn handle_set_scroll_states_msg(
         &self,
         pipeline_id: PipelineId,
@@ -2392,6 +2409,7 @@ impl ScriptThread {
         )
     }
 
+    #[trace_fn]
     fn handle_set_epoch_paint_time(&self, pipeline_id: PipelineId, epoch: Epoch, time: u64) {
         let Some(window) = self.documents.borrow().find_window(pipeline_id) else {
             warn!("Received set epoch paint time message for closed pipeline {pipeline_id}.");
@@ -2400,6 +2418,7 @@ impl ScriptThread {
         window.layout_mut().set_epoch_paint_time(epoch, time);
     }
 
+    #[trace_fn]
     fn handle_msg_from_webgpu_server(&self, msg: WebGPUMsg) {
         match msg {
             WebGPUMsg::FreeAdapter(id) => self.gpu_id_hub.lock().kill_adapter_id(id),
@@ -2518,6 +2537,7 @@ impl ScriptThread {
         }
     }
 
+    #[trace_fn]
     fn handle_webdriver_msg(&self, pipeline_id: PipelineId, msg: WebDriverScriptCommand) {
         // https://github.com/servo/servo/issues/23535
         // These two messages need different treatment since the JS script might mutate
@@ -2789,6 +2809,7 @@ impl ScriptThread {
         warn!("Page rect message sent to nonexistent pipeline");
     }
 
+    #[trace_fn]
     fn handle_new_layout(&self, new_layout_info: NewLayoutInfo, origin: MutableOrigin) {
         let NewLayoutInfo {
             parent_info,
@@ -3272,6 +3293,7 @@ impl ScriptThread {
     }
 
     /// Handles a Web font being loaded. Does nothing if the page no longer exists.
+    #[trace_fn]
     fn handle_web_font_loaded(&self, pipeline_id: PipelineId) {
         let document = self.documents.borrow().find_document(pipeline_id);
         if let Some(document) = document {
@@ -3733,9 +3755,12 @@ impl ScriptThread {
     }
 
     /// Reflows non-incrementally, rebuilding the entire layout tree in the process.
+    #[trace_fn]
     fn rebuild_and_force_reflow(&self, document: &Document, reason: ReflowReason) {
+        start_trace(&CString::new("dirty_all_nodes").unwrap());
         let window = window_from_node(document);
         document.dirty_all_nodes();
+        finish_trace();
         window.reflow(ReflowGoal::Full, reason);
     }
 
@@ -3909,6 +3934,7 @@ impl ScriptThread {
 
     /// Instructs the constellation to fetch the document that will be loaded. Stores the InProgressLoad
     /// argument until a notification is received that the fetch is complete.
+    #[trace_fn]
     fn pre_page_load(&self, mut incomplete: InProgressLoad, load_data: LoadData) {
         let id = incomplete.pipeline_id;
         let req_init = RequestBuilder::new(load_data.url.clone(), load_data.referrer)
@@ -3941,6 +3967,7 @@ impl ScriptThread {
         self.incomplete_loads.borrow_mut().push(incomplete);
     }
 
+    #[trace_fn]
     fn handle_fetch_metadata(
         &self,
         id: PipelineId,
@@ -3963,6 +3990,7 @@ impl ScriptThread {
         }
     }
 
+    #[trace_fn]
     fn handle_fetch_chunk(&self, id: PipelineId, chunk: Vec<u8>) {
         let mut incomplete_parser_contexts = self.incomplete_parser_contexts.0.borrow_mut();
         let parser = incomplete_parser_contexts

@@ -52,6 +52,10 @@ use crate::http_loader::{
 };
 use crate::subresource_integrity::is_response_integrity_valid;
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 lazy_static! {
     static ref X_CONTENT_TYPE_OPTIONS: HeaderName =
         HeaderName::from_static("x-content-type-options");

@@ -69,6 +69,10 @@ use crate::network_listener::PreInvoke;
 use crate::realms::enter_realm;
 use crate::script_thread::ScriptThread;
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 mod async_html;
 mod html;
 mod prefetch;
@@ -532,6 +536,7 @@ impl ServoParser {
         self.push_tendril_input_chunk(chunk);
     }
 
+    #[trace_fn]
     fn parse_sync(&self) {
         let metadata = TimerMetadata {
             url: self.document.url().as_str().into(),
@@ -551,6 +556,7 @@ impl ServoParser {
         )
     }
 
+    #[trace_fn]
     fn do_parse_sync(&self) {
         assert!(self.script_input.borrow().is_empty());
 

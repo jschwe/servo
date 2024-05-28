@@ -53,6 +53,10 @@ use crate::http_loader::{http_redirect_fetch, HttpState};
 use crate::storage_thread::StorageThreadFactory;
 use crate::{cookie, websocket_loader};
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 /// Load a file with CA certificate and produce a RootCertStore with the results.
 fn load_root_cert_store_from_file(file_path: String) -> io::Result<RootCertStore> {
     let mut root_cert_store = RootCertStore::empty();
@@ -156,6 +160,7 @@ struct ResourceChannelManager {
     ignore_certificate_errors: bool,
 }
 
+#[trace_fn]
 fn create_http_states(
     config_dir: Option<&Path>,
     ca_certificates: CACertificates,
@@ -208,6 +213,7 @@ fn create_http_states(
 
 impl ResourceChannelManager {
     #[allow(unsafe_code)]
+    #[trace_fn]
     fn start(
         &mut self,
         public_receiver: IpcReceiver<CoreResourceMsg>,
@@ -647,6 +653,7 @@ impl CoreResourceManager {
         }
     }
 
+    #[trace_fn]
     fn fetch<Target: 'static + FetchTaskTarget + Send>(
         &self,
         request_builder: RequestBuilder,

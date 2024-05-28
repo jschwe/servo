@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 use servo_config::pref;
 use servo_url::{Host, ServoUrl};
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HstsEntry {
     pub host: String,
@@ -86,6 +90,7 @@ impl HstsList {
         })
     }
 
+    #[trace_fn]
     pub fn from_servo_preload() -> HstsList {
         let list = resources::read_string(Resource::HstsPreloadList);
         HstsList::from_preload(&list).expect("Servo HSTS preload file is invalid")

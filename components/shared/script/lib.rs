@@ -67,6 +67,10 @@ use crate::serializable::{BlobData, BlobImpl};
 use crate::transferable::MessagePortImpl;
 use crate::webdriver_msg::{LoadStatus, WebDriverScriptCommand};
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 /// The address of a node. Layout sends these back. They must be validated via
 /// `from_untrusted_node_address` before they can be used, because we do not trust layout.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

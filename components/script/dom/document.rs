@@ -874,15 +874,15 @@ impl Document {
 
     /// Reflows and disarms the timer if the reflow timer has expired.
     pub fn reflow_if_reflow_timer_expired(&self) {
-        if let Some(reflow_timeout) = self.reflow_timeout.get() {
-            if time::precise_time_ns() < reflow_timeout {
-                return;
-            }
-
-            self.reflow_timeout.set(None);
-            self.window
-                .reflow(ReflowGoal::Full, ReflowReason::RefreshTick);
-        }
+        // if let Some(reflow_timeout) = self.reflow_timeout.get() {
+        //     if time::precise_time_ns() < reflow_timeout {
+        //         return;
+        //     }
+        //
+        //     self.reflow_timeout.set(None);
+        //     self.window
+        //         .reflow(ReflowGoal::Full, ReflowReason::RefreshTick);
+        // }
     }
 
     /// Schedules a reflow to be kicked off at the given `timeout` (in `time::precise_time_ns()`

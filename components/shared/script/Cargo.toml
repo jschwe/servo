@@ -46,3 +46,5 @@ webgpu = { path = "../../webgpu" }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 webxr-api = { git = "https://github.com/servo/webxr", features = ["ipc"] }
+hitrace = { workspace = true}
+hitrace-macro = { workspace = true}

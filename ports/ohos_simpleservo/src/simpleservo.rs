@@ -45,6 +45,10 @@ use servo::webrender_api::ScrollLocation;
 use servo::{self, gl, Servo, TopLevelBrowsingContextId};
 use surfman::{Connection, SurfaceType};
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
 }
@@ -240,6 +244,7 @@ pub fn set_pref(key: &str, val: PrefValue) -> Result<(), &'static str> {
 
 /// Initialize Servo. At that point, we need a valid GL context.
 /// In the future, this will be done in multiple steps.
+#[trace_fn]
 pub fn init(
     native_window: *mut c_void,
     xcomponent: *mut OH_NativeXComponent,
@@ -252,7 +257,8 @@ pub fn init(
 
     // file:///data/storage/el1/base/haps/entry/files/index.html
     // https://m.vmall.com/index.html
-    let pref_url = ServoUrl::parse("https://servo.org").ok();
+    // let pref_url = ServoUrl::parse("https://servo.org").ok();
+    let pref_url = ServoUrl::parse("file:///data/storage/el2/base/haps/entry/files/index.html").ok();
     let blank_url = ServoUrl::parse("about:blank").ok();
 
     let url = pref_url.or(blank_url).unwrap();
@@ -377,6 +383,7 @@ impl ServoGlue {
     /// This is the Servo heartbeat. This needs to be called
     /// everytime wakeup is called or when embedder wants Servo
     /// to act on its pending events.
+    #[trace_fn]
     pub fn perform_updates(&mut self) -> Result<(), &'static str> {
         debug!("perform_updates");
         let events = mem::replace(&mut self.events, Vec::new());

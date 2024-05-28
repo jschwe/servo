@@ -69,6 +69,10 @@ use crate::hsts::HstsList;
 use crate::http_cache::{CacheKey, HttpCache};
 use crate::resource_thread::AuthCache;
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 /// The various states an entry of the HttpCache can be in.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HttpCacheEntryState {
@@ -903,6 +907,7 @@ impl Drop for RedirectEndTimer {
 
 /// [HTTP redirect fetch](https://fetch.spec.whatwg.org#http-redirect-fetch)
 #[async_recursion]
+#[trace_fn]
 pub async fn http_redirect_fetch(
     request: &mut Request,
     cache: &mut CorsCache,

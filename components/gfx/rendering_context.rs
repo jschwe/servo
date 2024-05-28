@@ -16,6 +16,10 @@ use surfman::{
     SurfaceTexture, SurfaceType,
 };
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 /// A Servo rendering context, which holds all of the information needed
 /// to render Servo's layout, and bridges WebRender and surfman.
 #[derive(Clone)]
@@ -135,14 +139,17 @@ impl RenderingContext {
             })
     }
 
+    #[trace_fn]
     pub fn present(&self) -> Result<(), Error> {
         let device = &mut self.0.device.borrow_mut();
         let context = &mut self.0.context.borrow_mut();
         if let Some(ref swap_chain) = self.0.swap_chain {
             return swap_chain.swap_buffers(device, context, PreserveBuffer::No);
         }
+        start_trace(&CString::new("present_surface").unwrap());
         let mut surface = device.unbind_surface_from_context(context)?.unwrap();
         device.present_surface(context, &mut surface)?;
+        finish_trace();
         device
             .bind_surface_to_context(context, surface)
             .map_err(|(err, mut surface)| {

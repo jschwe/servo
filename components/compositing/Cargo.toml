@@ -45,6 +45,8 @@ webrender = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 webxr = { git = "https://github.com/servo/webxr" }
+hitrace = { workspace = true}
+hitrace-macro = { workspace = true}
 
 [build-dependencies]
 toml = "0.5"

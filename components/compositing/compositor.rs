@@ -60,6 +60,10 @@ use crate::windowing::{
 };
 use crate::{gl, InitialCompositorState};
 
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
+
 #[derive(Debug, PartialEq)]
 enum UnableToComposite {
     NotReadyToPaintImage(NotReadyToPaint),
@@ -693,6 +697,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
 
     /// Accept messages from content processes that need to be relayed to the WebRender
     /// instance in the parent process.
+    #[trace_fn]
     fn handle_webrender_message(&mut self, msg: ForwardedToCompositorMsg) {
         match msg {
             ForwardedToCompositorMsg::Layout(ScriptToCompositorMsg::SendInitialTransaction(
@@ -780,6 +785,8 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
                     display_list_descriptor,
                 );
 
+                start_trace(&CString::new("ScriptToCompositorMsg::SendDisplayList").unwrap());
+
                 let pipeline_id = display_list_info.pipeline_id;
                 let details = self.pipeline_details(pipeline_id.into());
                 details.most_recent_display_list_epoch = Some(display_list_info.epoch);
@@ -793,6 +800,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
                 self.generate_frame(&mut transaction, RenderReasons::SCENE);
                 self.webrender_api
                     .send_transaction(self.webrender_document, transaction);
+                finish_trace();
             },
 
             ForwardedToCompositorMsg::Layout(ScriptToCompositorMsg::HitTest(
@@ -2036,6 +2044,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
     /// Returns Ok if composition was performed or Err if it was not possible to composite for some
     /// reason. When the target is [CompositeTarget::SharedMemory], the image is read back from the
     /// GPU and returned as Ok(Some(png::Image)), otherwise we return Ok(None).
+    #[trace_fn]
     fn composite_specific_target(
         &mut self,
         target: CompositeTarget,
@@ -2251,6 +2260,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
             },
         };
 
+        start_trace(&CString::new("ConstellationMsg::ReadyToPresent").unwrap());
         // Notify embedder that servo is ready to present.
         // Embedder should call `present` to tell compositor to continue rendering.
         self.waiting_on_present = true;
@@ -2261,6 +2271,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
         }
 
         self.composition_request = CompositionRequest::NoCompositingNecessary;
+        finish_trace();
 
         self.process_animations(true);
 
@@ -2276,10 +2287,12 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
     }
 
     pub fn present(&mut self) {
+        start_trace(&CString::new("compositor present").unwrap());
         if let Err(err) = self.rendering_context.present() {
             warn!("Failed to present surface: {:?}", err);
         }
         self.waiting_on_present = false;
+        finish_trace();
     }
 
     fn composite_if_necessary(&mut self, reason: CompositingReason) {
@@ -2337,6 +2350,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
         );
     }
 
+    #[trace_fn]
     pub fn receive_messages(&mut self) -> bool {
         // Check for new messages coming from the other threads in the system.
         let mut compositor_messages = vec![];
@@ -2363,6 +2377,7 @@ impl<Window: WindowMethods + ?Sized> IOCompositor<Window> {
         true
     }
 
+    #[trace_fn]
     pub fn perform_updates(&mut self) -> bool {
         if self.shutdown_state == ShutdownState::FinishedShuttingDown {
             return false;

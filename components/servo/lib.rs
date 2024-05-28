@@ -24,6 +24,11 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::vec::Drain;
+use log::{debug, info};
+
+use hitrace_macro::trace_fn;
+use hitrace::{start_trace, finish_trace};
+use std::ffi::CString;
 
 pub use base::id::TopLevelBrowsingContextId;
 use base::id::{PipelineNamespace, PipelineNamespaceId};
@@ -224,6 +229,7 @@ impl<Window> Servo<Window>
 where
     Window: WindowMethods + 'static + ?Sized,
 {
+    #[trace_fn]
     pub fn new(
         mut embedder: Box<dyn EmbedderMethods>,
         window: Rc<Window>,
@@ -846,6 +852,7 @@ where
         }
     }
 
+    #[trace_fn]
     fn receive_messages(&mut self) {
         while let Some((top_level_browsing_context, msg)) =
             self.embedder_receiver.try_recv_embedder_msg()
@@ -876,6 +883,7 @@ where
         self.messages_for_embedder.drain(..)
     }
 
+    #[trace_fn]
     pub fn handle_events(&mut self, events: impl IntoIterator<Item = EmbedderEvent>) -> bool {
         if self.compositor.receive_messages() {
             self.receive_messages();

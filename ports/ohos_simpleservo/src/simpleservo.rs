@@ -32,11 +32,9 @@ use servo::embedder_traits::{
 };
 use servo::euclid::{Box2D, Point2D, Rect, Scale, Size2D, Vector2D};
 use servo::keyboard_types::{Key, KeyState, KeyboardEvent};
-pub use servo::msg::constellation_msg::InputMethodType;
-use servo::msg::constellation_msg::{TraversalDirection, WebViewId};
 use servo::rendering_context::RenderingContext;
 pub use servo::script_traits::{MediaSessionActionType, MouseButton};
-use servo::script_traits::{TouchEventType, TouchId};
+use servo::script_traits::{TouchEventType, TouchId, TraversalDirection};
 use servo::servo_config::{opts, pref};
 use servo::servo_url::ServoUrl;
 pub use servo::webrender_api::units::DeviceIntRect;
@@ -48,6 +46,7 @@ use surfman::{Connection, SurfaceType};
 use hitrace_macro::trace_fn;
 use hitrace::{start_trace, finish_trace};
 use std::ffi::CString;
+use servo::base::id::WebViewId;
 
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
@@ -143,7 +142,7 @@ pub trait HostTrait {
     /// A text input is focused.
     fn on_ime_show(
         &self,
-        input_type: InputMethodType,
+        input_type: servo::embedder_traits::InputMethodType,
         text: Option<(String, i32)>,
         multiline: bool,
         bounds: DeviceIntRect,

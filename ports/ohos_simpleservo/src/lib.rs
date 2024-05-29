@@ -648,7 +648,7 @@ impl HostTrait for HostCallbacks {
 
     fn on_ime_show(
         &self,
-        input_type: servo::msg::constellation_msg::InputMethodType,
+        input_type: servo::embedder_traits::InputMethodType,
         text: Option<(String, i32)>,
         multiline: bool,
         bounds: servo::webrender_api::units::DeviceIntRect,

@@ -27,7 +27,6 @@ serde_json = { workspace = true }
 servo-media = { git = "https://github.com/servo/media" }
 surfman = { workspace = true, features = ["sm-angle-default"] }
 webxr = { git = "https://github.com/servo/webxr" }
-ctor = "0.2.7"
 backtrace = "0.3.71"
 hitrace = { workspace = true}
 hitrace-macro = { workspace = true}

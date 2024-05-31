@@ -256,8 +256,8 @@ pub fn init(
 
     // file:///data/storage/el1/base/haps/entry/files/index.html
     // https://m.vmall.com/index.html
-    // let pref_url = ServoUrl::parse("https://servo.org").ok();
-    let pref_url = ServoUrl::parse("file:///data/storage/el2/base/haps/entry/files/index.html").ok();
+    let pref_url = ServoUrl::parse("https://servo.org").ok();
+    // let pref_url = ServoUrl::parse("file:///data/storage/el2/base/haps/entry/files/index.html").ok();
     let blank_url = ServoUrl::parse("about:blank").ok();
 
     let url = pref_url.or(blank_url).unwrap();

@@ -465,35 +465,15 @@ impl ServoGlue {
         self.process_event(EmbedderEvent::WindowResize)
     }
 
-    /// Start scrolling.
-    /// x/y are scroll coordinates.
-    /// dx/dy are scroll deltas.
-    pub fn scroll_start(&mut self, dx: f32, dy: f32, x: i32, y: i32) -> Result<(), &'static str> {
-        let delta = Vector2D::new(dx, dy);
-        let scroll_location = ScrollLocation::Delta(delta);
-        let event =
-            EmbedderEvent::Scroll(scroll_location, Point2D::new(x, y), TouchEventType::Down);
-        self.process_event(event)
-    }
-
     /// Scroll.
     /// x/y are scroll coordinates.
     /// dx/dy are scroll deltas.
     pub fn scroll(&mut self, dx: f32, dy: f32, x: i32, y: i32) -> Result<(), &'static str> {
+        info!("Scroll called from ({x},{y}) with delta ({dx},{dy})");
         let delta = Vector2D::new(dx, dy);
         let scroll_location = ScrollLocation::Delta(delta);
         let event =
             EmbedderEvent::Scroll(scroll_location, Point2D::new(x, y), TouchEventType::Move);
-        self.process_event(event)
-    }
-
-    /// End scrolling.
-    /// x/y are scroll coordinates.
-    /// dx/dy are scroll deltas.
-    pub fn scroll_end(&mut self, dx: f32, dy: f32, x: i32, y: i32) -> Result<(), &'static str> {
-        let delta = Vector2D::new(dx, dy);
-        let scroll_location = ScrollLocation::Delta(delta);
-        let event = EmbedderEvent::Scroll(scroll_location, Point2D::new(x, y), TouchEventType::Up);
         self.process_event(event)
     }
 

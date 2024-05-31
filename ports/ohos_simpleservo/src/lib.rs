@@ -11,6 +11,7 @@ use std::sync::mpsc;
 use std::thread;
 use ctor::ctor;
 use core::ptr;
+use std::convert::{TryFrom, TryInto};
 
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::{OH_NATIVE_XCOMPONENT_OBJ, OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_TouchEvent, OH_NativeXComponent_TouchEventType};
 
@@ -85,20 +86,9 @@ enum TouchEventType {
     Down,
     Up,
     Move,
+    Scroll{dx: f32, dy: f32},
     Cancel,
     Unknown,
-}
-
-impl From<OH_NativeXComponent_TouchEventType> for TouchEventType {
-    fn from(value: OH_NativeXComponent_TouchEventType) -> Self {
-        match value {
-            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_DOWN => TouchEventType::Down,
-            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_UP => TouchEventType::Up,
-            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_MOVE => TouchEventType::Move,
-            OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_CANCEL => TouchEventType::Cancel,
-            _ => TouchEventType::Unknown,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -108,11 +98,48 @@ enum ServoAction {
     TouchEvent{kind: TouchEventType, x: f32, y: f32, pointer_id: i32},
 }
 
+
+#[derive(Debug, Copy, Clone, Default)]
+enum Direction2D {
+    Horizontal,
+    Vertical,
+    #[default]
+    Free
+}
+#[derive(Clone, Debug)]
+struct TouchTracker {
+    last_position: Point2D<f32, f32>,
+}
+
+impl TouchTracker {
+    fn new(first_point: Point2D<f32, f32>) -> Self {
+        TouchTracker {
+            last_position: first_point
+        }
+    }
+}
+
+struct TsThreadState {
+    // last_touch_event: Option<OH_NativeXComponent_TouchEvent>,
+    velocity_tracker: Option<TouchTracker>
+}
+
+impl TsThreadState {
+    const fn new() -> Self {
+        Self {
+            velocity_tracker: None,
+        }
+    }
+}
+
+static mut TS_THREAD_STATE: TsThreadState = TsThreadState::new();
+
 impl ServoAction {
     fn dispatch_touch_event(servo: &mut ServoGlue, kind: TouchEventType, x: f32, y: f32, pointer_id: i32) -> Result<(), &'static str> {
         match kind {
             TouchEventType::Down => servo.touch_down(x, y, pointer_id),
             TouchEventType::Up => servo.touch_up(x, y, pointer_id),
+            TouchEventType::Scroll{dx, dy} => servo.scroll(dx, dy, x as i32, y as i32),
             TouchEventType::Move => servo.touch_move(x, y, pointer_id),
             TouchEventType::Cancel => servo.touch_cancel(x, y, pointer_id),
             TouchEventType::Unknown => Err("Can't dispatch Unknown Touch Event"),
@@ -204,7 +231,61 @@ pub extern "C" fn  on_dispatch_touch_event_cb(component: *mut OH_NativeXComponen
         return;
     }
     let touch_event = unsafe { touch_event.assume_init()};
-    let kind = TouchEventType::from(touch_event.type_);
+    let kind: TouchEventType = match touch_event.type_ {
+        OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_DOWN => {
+            if touch_event.id == 0 {
+                unsafe {
+                    let old = TS_THREAD_STATE.velocity_tracker.replace(TouchTracker::new(Point2D::new(touch_event.x, touch_event.y)));
+                    assert!(old.is_none());
+                }
+            }
+            TouchEventType::Down
+
+        },
+        OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_UP => {
+            if touch_event.id == 0 {
+                unsafe {
+                    let old = TS_THREAD_STATE.velocity_tracker.take();
+                    assert!(old.is_some());
+                }
+            }
+            TouchEventType::Up
+        },
+        OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_MOVE => {
+            // SAFETY: We only access TS_THREAD_STATE from the main TS thread.
+            if touch_event.id == 0 {
+                let (lastX, lastY) = unsafe {
+                    if let Some(last_event) = &mut TS_THREAD_STATE.velocity_tracker {
+                        let touch_point = last_event.last_position;
+                        last_event.last_position = Point2D::new(touch_event.x, touch_event.y);
+                        (touch_point.x, touch_point.y)
+                    } else {
+                        error!("Move Event received, but no previous touch event was stored!");
+                        // todo: handle this error case
+                        panic!("Move Event received, but no previous touch event was stored!");
+                    }
+                };
+                let dx = touch_event.x - lastX;
+                let dy = touch_event.y - lastY;
+                TouchEventType::Scroll {dx, dy}
+            } else {
+                TouchEventType::Move
+            }
+        },
+        OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_CANCEL => {
+            if touch_event.id == 0 {
+                unsafe {
+                    let old = TS_THREAD_STATE.velocity_tracker.take();
+                    assert!(old.is_some());
+                }
+            }
+            TouchEventType::Cancel
+        },
+        _ => {
+            error!("Failed to dispatch call for touch Event {:?}", touch_event.type_);
+            TouchEventType::Unknown
+        },
+    };
     if let Err(e) = call(ServoAction::TouchEvent {kind, x: touch_event.x, y: touch_event.y, pointer_id: touch_event.id}) {
         error!("Failed to dispatch call for touch Event {kind:?}");
     }
@@ -389,6 +470,7 @@ use napi_ohos::{bindgen_prelude::Undefined, sys::{napi_property_descriptor, napi
 use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::sys::napi_unwrap;
 use servo::config::opts;
+use servo::euclid::Point2D;
 
 #[napi]
 pub fn load_url(url: String) -> Undefined {

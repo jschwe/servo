@@ -21,7 +21,7 @@ use ohos_sys::napi::{napi_define_properties, napi_module, napi_status};
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentOffset;
 use ohos_sys::ace::xcomponent::native_interface_xcomponent::OH_NativeXComponent_GetXComponentSize;
 
-use napi_ohos::{bindgen_prelude::Undefined, Env, JsObject, NapiRaw, sys::{napi_property_descriptor, napi_throw_error}};
+use napi_ohos::{bindgen_prelude::Undefined, Env, JsFunction, JsObject, JsString, NapiRaw, sys::{napi_property_descriptor, napi_throw_error}};
 use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::sys::napi_unwrap;
 use servo::config::opts;
@@ -80,6 +80,8 @@ pub struct ServoCoordinates {
 
 use ohos_sys::napi::{napi_env, napi_value};
 use std::sync::mpsc::{Sender, Receiver};
+use napi_ohos::bindgen_prelude::{Function, FunctionRef};
+use napi_ohos::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode, UnknownReturnValue};
 
 #[repr(transparent)]
 struct XComponentWrapper(*mut OH_NativeXComponent);
@@ -125,6 +127,10 @@ impl TouchTracker {
         }
     }
 }
+
+// Todo: Need to check if OnceLock is suitable, or if the TS function can be destroyed, e.g.
+// if the activity gets suspended.
+static SET_URL_BAR_CB: OnceLock<ThreadsafeFunction<String, ErrorStrategy::Fatal>> = OnceLock::new();
 
 struct TsThreadState {
     // last_touch_event: Option<OH_NativeXComponent_TouchEvent>,
@@ -345,7 +351,7 @@ fn initialize_logging_once() {
     })
 }
 
-fn register_xcomponent_callbacks(env: Env, xcomponent: JsObject) -> napi_ohos::Result<()> {
+fn register_xcomponent_callbacks(env: &Env, xcomponent: &JsObject) -> napi_ohos::Result<()> {
     info!("napi_get_named_property call successfull");
     let raw = unsafe { xcomponent.raw() };
     let raw_env = env.raw();
@@ -374,12 +380,26 @@ fn register_xcomponent_callbacks(env: Env, xcomponent: JsObject) -> napi_ohos::R
     Ok(())
 }
 
+#[allow(unused)]
+fn debug_jsobject(obj: &JsObject, obj_name: &str) -> napi_ohos::Result<()> {
+    let names = obj.get_property_names()?;
+    error!("Getting property names of object {obj_name}");
+    let len = names.get_array_length()?;
+    error!("{obj_name} has {len} elements");
+    for i in 0..len {
+        let name: JsString = names.get_element(i)?;
+        let name = name.into_utf8()?;
+        error!("{obj_name} property {i}: {}", name.as_str()?)
+    }
+    Ok(())
+}
+
 #[module_exports]
 fn init(mut exports: JsObject, env: Env) -> napi_ohos::Result<()> {
     initialize_logging_once();
     error!("simpleservo init function called");
     if let Ok(xcomponent) = exports.get_named_property::<JsObject>("__NATIVE_XCOMPONENT_OBJ__") {
-        register_xcomponent_callbacks(env, xcomponent)?;
+        register_xcomponent_callbacks(&env, &xcomponent)?;
     }
 
     info!("Finished init");
@@ -390,6 +410,23 @@ fn init(mut exports: JsObject, env: Env) -> napi_ohos::Result<()> {
 pub fn load_url(url: String) -> Undefined {
     debug!("load url");
     call(ServoAction::LoadUrl(url)).expect("Failed to load url");
+}
+
+#[napi(js_name = "registerURLcallback")]
+pub fn register_url_callback(cb: JsFunction) -> napi_ohos::Result<()>{
+    info!("register_url_callback called!");
+    let tsfn: ThreadsafeFunction<String, ErrorStrategy::Fatal> = cb.create_threadsafe_function(
+        1, |ctx| {
+            debug!("url callback argument transformer called with arg {}", ctx.value);
+            let s = ctx.env.create_string_from_std(ctx.value)
+                .inspect_err(|e| error!("Failed to create JsString: {e:?}") )?;
+            Ok(vec![s])
+        }
+    )?;
+    // We ignore any error for now - but probably we should propagate it back to the TS layer.
+    let _ = SET_URL_BAR_CB.set(tsfn)
+        .inspect_err(|_| warn!("Failed to set URL callback - register_url_callback called twice?"));
+    Ok(())
 }
 
 
@@ -523,7 +560,14 @@ impl HostTrait for HostCallbacks {
         false
     }
 
-    fn on_url_changed(&self, url: String) {}
+    fn on_url_changed(&self, url: String) {
+        debug!("Hosttrait `on_url_changed` called with new url: {url}");
+        if let Some(cb) = SET_URL_BAR_CB.get() {
+            cb.call(url, ThreadsafeFunctionCallMode::Blocking);
+        } else {
+            warn!("`on_url_changed` called without a registered callback")
+        }
+    }
 
     fn on_history_changed(&self, can_go_back: bool, can_go_forward: bool) {}
 

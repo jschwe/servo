@@ -37,7 +37,7 @@ rustdocflags = ["--document-private-items"]
 rustc = "crown"
 
 [patch.crates-io]
-napi-derive-ohos = { git = "https://github.com/jschwe/ohos-rs.git", branch = "jschwender/ohos" }
+napi-derive-ohos = { git = "https://github.com/jschwe/ohos-rs.git", rev = "b22a0d673044053b17c71b4c99908df927061dbc" }
 # Status: Surfman is still being hacked on!
 # surfman = { path = "/home/jschwender/Dev/surfman/surfman" }
 surfman = { git = "https://github.com/servo/surfman" }

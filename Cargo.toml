@@ -139,7 +139,8 @@ hitrace-macro = { version = "0.1"}
 
 [profile.release]
 opt-level = 3
-debug-assertions = true
+debug-assertions = false
+lto = "thin"
 strip = true
 # Uncomment to profile on Linux:
 # debug = true

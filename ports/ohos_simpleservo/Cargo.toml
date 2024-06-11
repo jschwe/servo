@@ -45,4 +45,4 @@ vergen = { version = "8.0.0", features = ["git", "gitcl"] }
 [features]
 debugmozjs = ["libservo/debugmozjs"]
 default = ["max_log_level"]
-max_log_level = ["log/release_max_level_info", "log/max_level_info"]
+max_log_level = ["log/release_max_level_error", "log/max_level_error"]

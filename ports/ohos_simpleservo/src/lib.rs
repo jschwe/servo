@@ -327,7 +327,6 @@ fn initialize_logging_once() {
             let current_thread = thread::current();
             let name = current_thread.name().unwrap_or("<unnamed>");
             let stderr = std::io::stderr();
-            let mut stderr = stderr.lock();
             if let Some(location) = info.location() {
                 let _ = error!("{} (thread {}, at {}:{})",
                     msg,
@@ -340,7 +339,6 @@ fn initialize_logging_once() {
             }
 
             let _ = crate::backtrace::print();
-            drop(stderr);
 
             // if opts::get().hard_fail && !opts::get().multiprocess {
             //     std::process::exit(1);

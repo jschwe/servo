@@ -701,7 +701,10 @@ class CommandBase(object):
         if os_type not in ["linux", "darwin"]:
             raise Exception("OpenHarmony cross builds are currently only supported on Linux and macOS.")
 
-        llvm_toolchain = ndk_root.joinpath("llvm")
+        if 'llvm' in self.config["ohos"]:
+            llvm_toolchain = pathlib.Path(self.config["ohos"]['llvm'])
+        else:
+            llvm_toolchain = ndk_root.joinpath("llvm")
         llvm_bin = llvm_toolchain.joinpath("bin")
         ohos_sysroot = ndk_root.joinpath("sysroot")
         if not (llvm_toolchain.is_dir() and llvm_bin.is_dir()):

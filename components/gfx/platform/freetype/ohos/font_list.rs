@@ -82,6 +82,8 @@ impl FontList {
         let alternatives = [
             ("HarmonyOS Sans", "HarmonyOS_Sans_SC_Regular.ttf"),
             ("sans-serif", "HarmonyOS_Sans_SC_Regular.ttf"),
+            // Todo: It's unclear what font should be used, but we need to use something
+            ("serif", "HarmonyOS_Sans_SC_Regular.ttf"),
         ];
 
         alternatives

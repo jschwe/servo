@@ -226,7 +226,7 @@ pub extern "C" fn  on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, w
 
 // Todo: Probably we need to block here, until the main thread has processed the change.
 pub extern "C" fn  on_surface_changed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
-    info!("on_surface_changed_cb");
+    error!("on_surface_changed_cb is currently not implemented!");
 }
 
 pub extern "C" fn  on_surface_destroyed_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
@@ -395,7 +395,7 @@ fn debug_jsobject(obj: &JsObject, obj_name: &str) -> napi_ohos::Result<()> {
 #[module_exports]
 fn init(mut exports: JsObject, env: Env) -> napi_ohos::Result<()> {
     initialize_logging_once();
-    error!("simpleservo init function called");
+    info!("simpleservo init function called");
     if let Ok(xcomponent) = exports.get_named_property::<JsObject>("__NATIVE_XCOMPONENT_OBJ__") {
         register_xcomponent_callbacks(&env, &xcomponent)?;
     }
@@ -428,67 +428,6 @@ pub fn register_url_callback(cb: JsFunction) -> napi_ohos::Result<()>{
 }
 
 
-fn get_options(
-    opts: &mut ServoOptions,
-    surface: *mut c_void,
-) -> Result<(InitOptions, bool, Option<String>, Option<String>), String> {
-    let args = get_string_from_c_char(opts.args);
-    let url = get_string_from_c_char(opts.url);
-    let log_str = get_string_from_c_char(opts.log_str);
-    let gst_debug_str = get_string_from_c_char(opts.gst_debug_str);
-    let density = opts.density;
-    let log = opts.enable_logs;
-    let coordinates = c_coords_to_rust_coords(&opts.coordinates);
-
-    let args = match args {
-        Some(args) => serde_json::from_str(&args)
-            .map_err(|_| "Invalid arguments. Servo arguments must be formatted as a JSON array")?,
-        None => None,
-    };
-
-    // disable JIT
-    let mut prefs = HashMap::new();
-    prefs.insert("js.baseline_interpreter.enabled".to_string(), false.into());
-    prefs.insert("js.baseline_jit.enabled".to_string(), false.into());
-    prefs.insert("js.ion.enabled".to_string(), false.into());
-
-    let opts = InitOptions {
-        args: args.unwrap_or(vec![]),
-        coordinates,
-        density,
-        xr_discovery: None,
-        surfman_integration: simpleservo::SurfmanIntegration::Widget(surface),
-        prefs: Some(prefs),
-    };
-
-    Ok((opts, log, log_str, gst_debug_str))
-}
-
-fn get_string_from_c_char(ptr: *mut c_char) -> Option<String> {
-    if ptr.is_null() {
-        return None;
-    }
-
-    unsafe {
-        let cstr = CStr::from_ptr(ptr);
-        match cstr.to_str() {
-            Ok(s) => Some(s.to_string()),
-            Err(_) => None,
-        }
-    }
-}
-
-fn c_coords_to_rust_coords(c_coords: &ServoCoordinates) -> Coordinates {
-    Coordinates::new(
-        c_coords.x,
-        c_coords.y,
-        c_coords.width,
-        c_coords.height,
-        c_coords.fb_width,
-        c_coords.fb_height,
-    )
-}
-
 #[derive(Clone)]
 pub struct WakeupCallback {
     chan: Sender<ServoAction>
@@ -513,7 +452,6 @@ impl EventLoopWaker for WakeupCallback {
     }
 }
 
-// TODO HostCallbacks
 struct HostCallbacks {}
 
 impl HostCallbacks {

@@ -58,12 +58,8 @@ thread_local! {
 pub use servo::embedder_traits::EventLoopWaker;
 
 pub struct InitOptions {
-    pub args: Vec<String>,
-    pub coordinates: Coordinates,
+    pub url: String,
     pub density: f32,
-    pub xr_discovery: Option<webxr::Discovery>,
-    pub surfman_integration: SurfmanIntegration,
-    pub prefs: Option<HashMap<String, PrefValue>>,
 }
 
 /// Controls how this embedding's rendering will integrate with the embedder.
@@ -189,14 +185,6 @@ pub struct ServoGlue {
 #[derive(Debug)]
 pub struct WebView {}
 
-pub fn servo_version() -> String {
-    format!(
-        "Servo {}-{}",
-        env!("CARGO_PKG_VERSION"),
-        env!("VERGEN_GIT_SHA")
-    )
-}
-
 /// Test if a url is valid.
 pub fn is_uri_valid(url: &str) -> bool {
     info!("load_uri: {}", url);
@@ -245,6 +233,7 @@ pub fn set_pref(key: &str, val: PrefValue) -> Result<(), &'static str> {
 /// In the future, this will be done in multiple steps.
 #[trace_fn]
 pub fn init(
+    // options: InitOptions,
     native_window: *mut c_void,
     xcomponent: *mut OH_NativeXComponent,
     gl: Rc<dyn gl::Gl>,
@@ -334,6 +323,7 @@ pub fn init(
     let servo = Servo::new(
         embedder_callbacks,
         window_callbacks.clone(),
+        // User agent: Mozilla/5.0 (<Phone|PC|Tablet>; HarmonyOS 5.0) bla bla
         None,
         CompositeTarget::Window,
     );

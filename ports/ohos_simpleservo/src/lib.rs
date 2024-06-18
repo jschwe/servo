@@ -555,7 +555,7 @@ impl HostTrait for HostCallbacks {
     fn on_title_changed(&self, title: Option<String>) {}
 
     fn on_allow_navigation(&self, url: String) -> bool {
-        false
+        true
     }
 
     fn on_url_changed(&self, url: String) {

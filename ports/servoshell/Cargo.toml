@@ -95,6 +95,8 @@ ohos-vsync = "0.1.2"
 ohos-ime = { version = "0.2" }
 ohos-ime-sys = "0.1.1"
 xcomponent-sys = { version = "0.1.1", features = ["api-12", "keyboard-types"] }
+hitrace = "0.1.4"
+hitrace-macro = "0.1.0"
 
 [target.'cfg(any(target_os = "android", target_env = "ohos"))'.dependencies]
 nix = { workspace = true, features = ["fs"] }

@@ -707,6 +707,7 @@ impl HostTrait for HostCallbacks {
 
     fn on_load_ended(&self) {
         self.prompt_alert("Page finished loading!".to_string(), true);
+        run_hitrace_benchmark();
     }
 
     fn on_title_changed(&self, title: Option<String>) {
@@ -822,4 +823,35 @@ impl HostTrait for HostCallbacks {
         self.prompt_alert("Servo crashed!".to_string(), true);
         self.prompt_alert(reason, true);
     }
+}
+
+#[tracing::instrument(skip(count), fields(servo_profiling = true))]
+fn rec_tokio_instrument(count: usize) {
+    if count > 0 {
+        rec_tokio_instrument(count - 1)
+    }
+}
+
+#[hitrace_macro::trace_fn]
+fn rec_hitrace_instrument(count: usize) {
+    if count > 0 {
+        rec_hitrace_instrument(count - 1)
+    }
+}
+
+fn run_hitrace_benchmark() {
+    thread::scope(|s| {
+        thread::Builder::new().name("bench_hitrace".to_string()).spawn_scoped(s, || {
+            rec_hitrace_instrument(100);
+            rec_hitrace_instrument(100);
+            rec_hitrace_instrument(100);
+            rec_hitrace_instrument(100);
+
+            rec_tokio_instrument(100);
+            rec_tokio_instrument(100);
+            rec_tokio_instrument(100);
+            rec_tokio_instrument(100);
+        }).expect("bench thread failed");
+    });
+    error!("Finished recursive hitrace instrument");
 }

@@ -5,6 +5,7 @@
 #![allow(non_snake_case)]
 
 mod simpleservo;
+mod resources;
 
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_void};

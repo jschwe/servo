@@ -13,6 +13,7 @@ interface InitOpts {
   url: string;
   deviceType: string,
   osFullName: string,
+  resourceDir: string,
   displayDensity: number,
 }
 
@@ -82,11 +83,14 @@ struct Index {
         .focusable(true)
         .onLoad((xComponentContext) => {
           this.xComponentContext = xComponentContext as ServoXComponentInterface;
+          let resource_dir: string = this.getUIContext().getHostContext()?.resourceDir || "";
+          console.debug("Resources are located at %s", resource_dir);
           let init_options: InitOpts = {
             url: this.urlToLoad,
             deviceType: get_device_type(),
             osFullName: deviceInfo.osFullName,
             displayDensity: get_density(),
+            resourceDir: resource_dir,
           }
           this.xComponentContext.initServo(init_options)
           this.xComponentContext.registerURLcallback((new_url) => {

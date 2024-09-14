@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# This script checks if all C and C++ files are compiled with optimizations.
+# Usage:
+# 0. Edit: LLVM_BIN_PATH to point to the llvm binary location which contains the "real" clang we should
+# dispatch to.
+# 1. Create two symlinks to this file: wrapper-clang and wrapper-clang++
+# 2. export TARGET_CC=/path/to/wrapper-clang
+#    export TARGET_CXX=/path/to/wrapper-clang++
+# 3. Run ./mach build --release
+
+LLVM_BIN_PATH=/usr/bin
+#LLVM_BIN_PATH="/Users/jschwender/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/native/llvm/bin"
+REAL_CLANG_PATH="${LLVM_BIN_PATH}/clang"
+REAL_CLANGCPP_PATH="${LLVM_BIN_PATH}/clang++"
+
+# We use the same wrapper for clang and clang++, so we check the symlink name
+# to determine which executable to dispatch to.
+BASENAME=$(basename "$0")
+if [[ "${BASENAME}" == *clang ]];
+then
+  COMPILER_PATH="${REAL_CLANG_PATH}"
+elif [[ "${BASENAME}" == *clang++ ]];
+then
+  COMPILER_PATH="${REAL_CLANGCPP_PATH}"
+else
+  echo "Error: basename ${BASENAME} - unable to determine if clang or clang++"
+  exit 1
+fi
+
+opt_level=""
+for flag in "$@"
+do
+    if [[ "${flag}" =~  ^-O([0-3sg]|fast)?$ ]]; then
+      opt_level="${flag}"
+    elif [[ "${flag}" =~ conftest.*\.c(pp)?$ ]]; then
+        # autoconf configure check
+        skip_check="SKIP"
+        break
+    elif [[ "${flag}" =~ aws-lc-sys-.*/aws-lc/tests/.*\.c(pp)?$ ]]; then
+        skip_check="SKIP"
+        break
+    elif [[ "${flag}" == "-Wl,"* ]]; then
+         skip_check="SKIP"
+         break
+    elif [[ "${flag}" == "-E" ]]; then
+        # We are in preprocessor only mode, so optimizations don't matter
+        skip_check="SKIP"
+        break
+    fi
+done
+
+if [[ "${skip_check}" == "SKIP" ]]; then
+    # Don't care about opt level
+    :
+elif [[ "${opt_level}" == "-Ofast" ]]; then
+    >&2 echo "clang was supposed to be invoked with -Ofast! We want standard compliance."
+    >&2 echo "All options: " "$@"
+    exit 1
+elif [[ "${opt_level}" == "-O0" || "${opt_level}" == "" || "${opt_level}" == "-O" || "${opt_level}" == "-Og" ]]; then
+    >&2 echo "Source files should be compiled in release mode, but optimizations were disabled!"
+    exit 1
+elif [[ "${opt_level}" == "-O1" ]]; then
+  >&2 echo "Warning: Source files will be compiled with -O1"
+  exit 1
+fi
+
+# echo "Last opt level was: ${opt_level}"
+
+exec "${COMPILER_PATH}" "$@"

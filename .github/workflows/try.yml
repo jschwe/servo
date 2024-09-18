@@ -101,7 +101,7 @@ jobs:
     with:
       workflow: ${{ matrix.workflow }}
       wpt-layout: ${{ matrix.wpt_layout }}
-      profile: ${{ matrix.profile }}
+      profile: production
       unit-tests: ${{ matrix.unit_tests }}
       wpt-args: ${{ matrix.wpt_args }}
 

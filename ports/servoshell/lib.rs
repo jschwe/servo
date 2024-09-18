@@ -36,6 +36,9 @@ pub mod platform {
     pub fn deinit(_clean_shutdown: bool) {}
 }
 
+#[cfg(servo_production)]
+const _LOG_LEVEL: () = assert!(log::STATIC_MAX_LEVEL as usize <= log::Level::Info as usize);
+
 #[cfg(not(any(target_os = "android", target_env = "ohos")))]
 pub fn main() {
     desktop::cli::main()

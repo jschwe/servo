@@ -612,7 +612,11 @@ impl HostTrait for HostCallbacks {
     }
 
     fn on_devtools_started(&self, port: Result<u16, ()>, token: String) {
-        warn!("on_devtools_started not implemented");
+        match port {
+            Ok(p) => info!("Devtools Server running on port {}", p),
+            Err(()) => error!("Error running devtools server"),
+        }
+
     }
 
     fn on_panic(&self, reason: String, backtrace: Option<String>) {

@@ -20,6 +20,7 @@ use servo::euclid::Size2D;
 use servo::servo_url::ServoUrl;
 use servo::webrender_traits::RenderingContext;
 use servo::{self, gl, Servo};
+use servo::servo_config::opts;
 use surfman::{Connection, SurfaceType};
 
 use crate::egl::host_trait::HostTrait;
@@ -43,6 +44,8 @@ pub fn init(
     crate::init_tracing();
     let resource_dir = PathBuf::from(&options.resource_dir).join("servo");
     resources::set(Box::new(ResourceReaderInstance::new(resource_dir)));
+    // We don't have any arguments yet, but this will load fallback options from prefs.json
+    opts::from_cmdline_args(getopts::Options::new(), &["servoshell".to_string()]);
 
     gl.clear_color(1.0, 1.0, 1.0, 1.0);
     gl.clear(gl::COLOR_BUFFER_BIT);

@@ -592,9 +592,10 @@ fn run_server(
             // accept connections and process them, spawning a new thread for each one
             for stream in listener.incoming() {
                 let mut stream = stream.expect("Can't retrieve stream");
-                if !allow_devtools_client(&mut stream, &embedder, &token) {
-                    continue;
-                };
+                debug!("New connection from {:?}", stream.peer_addr());
+                // if !allow_devtools_client(&mut stream, &embedder, &token) {
+                //     continue;
+                // };
                 // connection succeeded and accepted
                 sender
                     .send(DevtoolsControlMsg::FromChrome(
@@ -622,6 +623,7 @@ fn run_server(
                     let mut streams = browsing_context.streams.borrow_mut();
                     streams.insert(id, stream.try_clone().unwrap());
                 }
+                debug!("Spawned new DevtoolsClientHandler for {:?}", &stream.peer_addr());
                 thread::Builder::new()
                     .name("DevtoolsClientHandler".to_owned())
                     .spawn(move || handle_client(actors, stream.try_clone().unwrap(), id))

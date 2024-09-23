@@ -307,6 +307,7 @@ fn initialize_logging_once() {
             "canvas::webgl_thread",
             "compositing::compositor",
             "constellation::constellation",
+            "devtools",
         ];
         for &module in &filters {
             builder.filter_module(module, log::LevelFilter::Debug);

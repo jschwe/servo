@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 #![allow(non_snake_case)]
 
+use std::cell::RefCell;
 use std::mem::MaybeUninit;
 use std::os::raw::c_void;
 use std::sync::mpsc::{Receiver, Sender};
@@ -17,6 +18,7 @@ use napi_ohos::threadsafe_function::{
     ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode,
 };
 use napi_ohos::{Env, JsFunction, JsObject, JsString, NapiRaw};
+use ohos_ime::{AttachOptions, ImeProxy, RawTextEditorProxy};
 use ohos_sys::xcomponent::{
     OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent,
     OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_TouchEvent,
@@ -525,11 +527,15 @@ impl EventLoopWaker for WakeupCallback {
     }
 }
 
-struct HostCallbacks {}
+struct HostCallbacks {
+    ime_proxy: RefCell<Option<ohos_ime::ImeProxy>>,
+}
 
 impl HostCallbacks {
     pub fn new() -> Self {
-        HostCallbacks {}
+        HostCallbacks {
+            ime_proxy: RefCell::new(None),
+        }
     }
 }
 
@@ -612,11 +618,35 @@ impl HostTrait for HostCallbacks {
         multiline: bool,
         bounds: servo::webrender_api::units::DeviceIntRect,
     ) {
-        warn!("on_title_changed not implemented")
+        warn!("IME show!");
+        // Maybe, just maybe, making the most basic text editor, without anything attached
+        // will just work, if we also forward all the key events to servo....
+        let mut ime_proxy = self.ime_proxy.borrow_mut();
+        let ime = ime_proxy.get_or_insert_with(|| {
+            let options = AttachOptions::new(true);
+            let editor = RawTextEditorProxy::new();
+            ImeProxy::new(editor, options)
+        });
+        match ime.show_keyboard() {
+            Ok(()) => info!("IME show keyboard - success"),
+            Err(_e) => error!("IME show keyboard error"),
+        }
     }
 
     fn on_ime_hide(&self) {
-        warn!("on_title_changed not implemented")
+        warn!("IME hide!");
+        // Maybe, just maybe, making the most basic text editor, without anything attached
+        // will just work, if we also forward all the key events to servo....
+        let mut ime_proxy = self.ime_proxy.borrow_mut();
+        let ime = ime_proxy.get_or_insert_with(|| {
+            let options = AttachOptions::new(true);
+            let editor = RawTextEditorProxy::new();
+            ImeProxy::new(editor, options)
+        });
+        match ime.show_keyboard() {
+            Ok(()) => info!("IME hide keyboard - success"),
+            Err(_e) => error!("IME hide keyboard error"),
+        }
     }
 
     fn get_clipboard_contents(&self) -> Option<String> {

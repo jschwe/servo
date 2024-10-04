@@ -20,9 +20,10 @@ use napi_ohos::threadsafe_function::{
 use napi_ohos::{Env, JsFunction, JsObject, JsString, NapiRaw};
 use ohos_ime::{AttachOptions, ImeProxy, RawTextEditorProxy};
 use ohos_sys::xcomponent::{
-    OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetTouchEvent,
-    OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_TouchEvent,
-    OH_NativeXComponent_TouchEventType,
+    OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetKeyEvent,
+    OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_KeyEvent,
+    OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_RegisterKeyEventCallback,
+    OH_NativeXComponent_TouchEvent, OH_NativeXComponent_TouchEventType,
 };
 use servo::embedder_traits::PromptResult;
 use servo::euclid::Point2D;
@@ -294,6 +295,14 @@ pub extern "C" fn on_dispatch_touch_event_cb(
     }
 }
 
+pub extern "C" fn on_dispatch_key_event(xc: *mut OH_NativeXComponent, _window: *mut c_void) {
+    info!("DispatchKeyEvent");
+    let mut event: *mut OH_NativeXComponent_KeyEvent = core::ptr::null_mut();
+    let res = unsafe { OH_NativeXComponent_GetKeyEvent(xc, &mut event as *mut *mut _) };
+}
+
+// todo: OH_NativeXComponent_SetNeedSoftKeyboard() instead of IME kit?
+
 fn initialize_logging_once() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
@@ -381,7 +390,16 @@ fn register_xcomponent_callbacks(env: &Env, xcomponent: &JsObject) -> napi_ohos:
     if res != 0 {
         error!("Failed to register callbacks");
     } else {
-        info!("Registerd callbacks successfully");
+        info!("Registered callbacks successfully");
+    }
+
+    let res = unsafe {
+        OH_NativeXComponent_RegisterKeyEventCallback(nativeXComponent, Some(on_dispatch_key_event))
+    };
+    if res != 0 {
+        error!("Failed to register key event callbacks");
+    } else {
+        debug!("Registered key event callbacks successfully");
     }
     Ok(())
 }

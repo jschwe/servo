@@ -11,7 +11,7 @@ use std::sync::{mpsc, Once, OnceLock};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-
+use keyboard_types::Key;
 use log::{debug, error, info, trace, warn, LevelFilter};
 use napi_derive_ohos::{module_exports, napi};
 use napi_ohos::threadsafe_function::{
@@ -21,14 +21,18 @@ use napi_ohos::{Env, JsFunction, JsObject, JsString, NapiRaw};
 use ohos_ime::{AttachOptions, ImeProxy, RawTextEditorProxy};
 use ohos_sys::xcomponent::{
     OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetKeyEvent,
-    OH_NativeXComponent_GetTouchEvent, OH_NativeXComponent_KeyEvent,
-    OH_NativeXComponent_RegisterCallback, OH_NativeXComponent_RegisterKeyEventCallback,
-    OH_NativeXComponent_TouchEvent, OH_NativeXComponent_TouchEventType,
+    OH_NativeXComponent_GetKeyEventAction, OH_NativeXComponent_GetTouchEvent,
+    OH_NativeXComponent_KeyEvent, OH_NativeXComponent_RegisterCallback,
+    OH_NativeXComponent_RegisterKeyEventCallback, OH_NativeXComponent_TouchEvent,
+    OH_NativeXComponent_TouchEventType,
 };
 use servo::embedder_traits::PromptResult;
 use servo::euclid::Point2D;
 use servo::style::Zero;
 use simpleservo::EventLoopWaker;
+use xcomponent_sys::{
+    OH_NativeXComponent_GetKeyEventCode, OH_NativeXComponent_KeyAction, OH_NativeXComponent_KeyCode,
+};
 
 use super::gl_glue;
 use super::host_trait::HostTrait;
@@ -99,6 +103,8 @@ enum ServoAction {
         y: f32,
         pointer_id: i32,
     },
+    KeyUp(Key),
+    KeyDown(Key),
     Initialize(Box<InitOpts>),
     Vsync,
 }
@@ -138,6 +144,8 @@ impl ServoAction {
                 y,
                 pointer_id,
             } => Self::dispatch_touch_event(servo, *kind, *x, *y, *pointer_id),
+            KeyUp(k) => servo.key_up(k.clone()),
+            KeyDown(k) => servo.key_down(k.clone()),
             Initialize(_init_opts) => {
                 panic!("Received Initialize event, even though servo is already initialized")
             },
@@ -299,6 +307,31 @@ pub extern "C" fn on_dispatch_key_event(xc: *mut OH_NativeXComponent, _window: *
     info!("DispatchKeyEvent");
     let mut event: *mut OH_NativeXComponent_KeyEvent = core::ptr::null_mut();
     let res = unsafe { OH_NativeXComponent_GetKeyEvent(xc, &mut event as *mut *mut _) };
+    assert_eq!(res, 0);
+
+    let mut action = OH_NativeXComponent_KeyAction::OH_NATIVEXCOMPONENT_KEY_ACTION_UNKNOWN;
+    let res = unsafe { OH_NativeXComponent_GetKeyEventAction(event, &mut action as *mut _) };
+    assert_eq!(res, 0);
+
+    let mut keycode = OH_NativeXComponent_KeyCode::KEY_UNKNOWN;
+    let res = unsafe { OH_NativeXComponent_GetKeyEventCode(event, &mut keycode as *mut _) };
+    assert_eq!(res, 0);
+
+    // Simplest possible impl, just for testing purposes
+    let code: keyboard_types::Code = keycode.into();
+    // FIXME for just A-Z0-9 without any modifiers
+    // this would be fine. But we really want to support modifiers.
+    let char = code.to_string();
+    let key = Key::Character(char);
+    match action {
+        OH_NativeXComponent_KeyAction::OH_NATIVEXCOMPONENT_KEY_ACTION_UP => {
+            call(ServoAction::KeyUp(key)).expect("Call failed")
+        },
+        OH_NativeXComponent_KeyAction::OH_NATIVEXCOMPONENT_KEY_ACTION_DOWN => {
+            call(ServoAction::KeyDown(key)).expect("Call failed")
+        }
+        _ => error!("Unknown key action {:?}", action),
+    }
 }
 
 // todo: OH_NativeXComponent_SetNeedSoftKeyboard() instead of IME kit?

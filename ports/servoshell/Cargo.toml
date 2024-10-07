@@ -88,9 +88,11 @@ ipc-channel = { workspace = true, features = ["force-inprocess"] }
 hilog = "0.1.0"
 napi-derive-ohos = "0.0.9"
 napi-ohos = "0.1"
-ohos-sys = { version = "0.3.1", features = ["xcomponent"] }
+ohos-sys = { version = "0.3.1", features = ["xcomponent"], path = "/home/jschwender/Dev/ohos-sys" }
 ohos-vsync = "0.1"
-ohos-ime = { version = "0.1", path = "/home/jschwender/Dev/ohos-inputmethod"}
+ohos-ime = { version = "0.1", path = "/home/jschwender/Dev/ohos-inputmethod" }
+xcomponent-sys = { version = "0.1.0", path = "/home/jschwender/Dev/ohos-sys/components/xcomponent", features = ["api-12", "keyboard-types"] }
+keyboard-types = "0.7.0"
 
 [target.'cfg(any(target_os = "android", target_env = "ohos"))'.dependencies]
 nix = { workspace = true, features = ["fs"] }

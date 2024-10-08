@@ -126,7 +126,7 @@ use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
 use ipc_channel::Error as IpcError;
 use keyboard_types::webdriver::Event as WebDriverInputEvent;
-use keyboard_types::KeyboardEvent;
+use keyboard_types::{CompositionEvent, KeyboardEvent};
 use log::{debug, error, info, trace, warn};
 use media::{GLPlayerThreads, WindowGLContext};
 use net_traits::pub_domains::reg_host;
@@ -1357,6 +1357,9 @@ where
             FromCompositorMsg::Keyboard(key_event) => {
                 self.handle_key_msg(key_event);
             },
+            FromCompositorMsg::CompositionEvent(ime_event) => {
+                self.handle_ime_msg(ime_event);
+            }
             FromCompositorMsg::IMEDismissed => {
                 self.handle_ime_dismissed();
             },
@@ -4130,6 +4133,47 @@ where
             if let Err(e) = result {
                 self.handle_send_error(pipeline_id, e);
             }
+        }
+    }
+
+
+    // CompositionEvent
+    #[tracing::instrument(skip(self), fields(servo_profiling = true))]
+    fn handle_ime_msg(&mut self, event: CompositionEvent) {
+        // Send to the focused browsing contexts' current pipeline.  If it
+        // doesn't exist, fall back to sending to the compositor.
+        let focused_browsing_context_id = self
+            .webviews
+            .focused_webview()
+            .map(|(_, webview)| webview.focused_browsing_context_id);
+        match focused_browsing_context_id {
+            Some(browsing_context_id) => {
+                let event = CompositorEvent::CompositionEvent(event);
+                let pipeline_id = match self.browsing_contexts.get(&browsing_context_id) {
+                    Some(ctx) => ctx.pipeline_id,
+                    None => {
+                        return warn!(
+                            "{}: Got key event for nonexistent browsing context",
+                            browsing_context_id,
+                        );
+                    },
+                };
+                let msg = ConstellationControlMsg::SendEvent(pipeline_id, event);
+                let result = match self.pipelines.get(&pipeline_id) {
+                    Some(pipeline) => pipeline.event_loop.send(msg),
+                    None => {
+                        return debug!("{}: Got key event after closure", pipeline_id);
+                    },
+                };
+                if let Err(e) = result {
+                    self.handle_send_error(pipeline_id, e);
+                }
+            },
+            None => {
+                warn!("No focused browsing context! Falling back to sending key to compositor");
+                let event = (None, EmbedderMsg::CompositionEvent(event));
+                self.embedder_proxy.send(event);
+            },
         }
     }
 

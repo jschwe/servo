@@ -9,7 +9,7 @@ use std::fmt::{Debug, Error, Formatter};
 use base::id::{PipelineId, TopLevelBrowsingContextId, WebViewId};
 use crossbeam_channel::{Receiver, Sender};
 use ipc_channel::ipc::IpcSender;
-use keyboard_types::KeyboardEvent;
+use keyboard_types::{CompositionEvent, KeyboardEvent};
 use log::warn;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -168,6 +168,8 @@ pub enum EmbedderMsg {
     AllowUnload(IpcSender<bool>),
     /// Sends an unconsumed key event back to the embedder.
     Keyboard(KeyboardEvent),
+    /// Sends an unconsumed composition event (IME) back to the embedder.
+    CompositionEvent(CompositionEvent),
     /// Gets system clipboard contents
     GetClipboardContents(IpcSender<String>),
     /// Sets system clipboard contents
@@ -245,6 +247,7 @@ impl Debug for EmbedderMsg {
             EmbedderMsg::AllowUnload(..) => write!(f, "AllowUnload"),
             EmbedderMsg::AllowNavigationRequest(..) => write!(f, "AllowNavigationRequest"),
             EmbedderMsg::Keyboard(..) => write!(f, "Keyboard"),
+            EmbedderMsg::CompositionEvent(..) => write!(f, "CompositionEvent"),
             EmbedderMsg::GetClipboardContents(..) => write!(f, "GetClipboardContents"),
             EmbedderMsg::SetClipboardContents(..) => write!(f, "SetClipboardContents"),
             EmbedderMsg::SetCursor(..) => write!(f, "SetCursor"),

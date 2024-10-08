@@ -18,7 +18,7 @@ use napi_ohos::threadsafe_function::{
     ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode,
 };
 use napi_ohos::{Env, JsFunction, JsObject, JsString, NapiRaw};
-use ohos_ime::{AttachOptions, ImeProxy, RawTextEditorProxy};
+use ohos_ime::{AttachOptions, Ime, ImeProxy, RawTextEditorProxy};
 use ohos_sys::xcomponent::{
     OH_NativeXComponent, OH_NativeXComponent_Callback, OH_NativeXComponent_GetKeyEvent,
     OH_NativeXComponent_GetKeyEventAction, OH_NativeXComponent_GetTouchEvent,
@@ -105,6 +105,7 @@ enum ServoAction {
     },
     KeyUp(Key),
     KeyDown(Key),
+    InsertText(String),
     Initialize(Box<InitOpts>),
     Vsync,
 }
@@ -131,6 +132,7 @@ impl ServoAction {
         }
     }
 
+    // todo: consider making this take `self`, so we don't need to needlessly clone.
     fn do_action(&self, servo: &mut ServoGlue) {
         use ServoAction::*;
         let res = match self {
@@ -146,6 +148,7 @@ impl ServoAction {
             } => Self::dispatch_touch_event(servo, *kind, *x, *y, *pointer_id),
             KeyUp(k) => servo.key_up(k.clone()),
             KeyDown(k) => servo.key_down(k.clone()),
+            InsertText(text) => servo.ime_insert_text(text.clone()),
             Initialize(_init_opts) => {
                 panic!("Received Initialize event, even though servo is already initialized")
             },
@@ -590,6 +593,13 @@ impl HostCallbacks {
     }
 }
 
+struct ServoIme {}
+impl Ime for ServoIme {
+    fn insert_text(&self, text: String) {
+        call(ServoAction::InsertText(text)).unwrap()
+    }
+}
+
 #[allow(unused)]
 impl HostTrait for HostCallbacks {
     fn prompt_alert(&self, msg: String, _trusted: bool) {
@@ -676,7 +686,7 @@ impl HostTrait for HostCallbacks {
         let ime = ime_proxy.get_or_insert_with(|| {
             let options = AttachOptions::new(true);
             let editor = RawTextEditorProxy::new();
-            ImeProxy::new(editor, options)
+            ImeProxy::new(editor, options, Box::new(ServoIme{}))
         });
         match ime.show_keyboard() {
             Ok(()) => info!("IME show keyboard - success"),
@@ -689,10 +699,11 @@ impl HostTrait for HostCallbacks {
         // Maybe, just maybe, making the most basic text editor, without anything attached
         // will just work, if we also forward all the key events to servo....
         let mut ime_proxy = self.ime_proxy.borrow_mut();
+        // todo: perhaps we should unwrap here, since probably hide always comes after a show?
         let ime = ime_proxy.get_or_insert_with(|| {
             let options = AttachOptions::new(true);
             let editor = RawTextEditorProxy::new();
-            ImeProxy::new(editor, options)
+            ImeProxy::new(editor, options, Box::new(ServoIme{}))
         });
         match ime.show_keyboard() {
             Ok(()) => info!("IME hide keyboard - success"),

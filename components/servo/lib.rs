@@ -722,6 +722,13 @@ where
                 }
             },
 
+            EmbedderEvent::IMEComposition(ime_event) => {
+                let msg = ConstellationMsg::CompositionEvent(ime_event);
+                if let Err(e) = self.constellation_chan.send(msg) {
+                    warn!("Sending composition event to constellation failed ({:?}).", e);
+                }
+            }
+
             EmbedderEvent::IMEDismissed => {
                 let msg = ConstellationMsg::IMEDismissed;
                 if let Err(e) = self.constellation_chan.send(msg) {
@@ -931,6 +938,7 @@ where
     }
 
     pub fn setup_logging(&self) {
+        // todo: ohos/android?
         let constellation_chan = self.constellation_chan.clone();
         let env = env_logger::Env::default();
         let env_logger = EnvLoggerBuilder::from_env(env).build();

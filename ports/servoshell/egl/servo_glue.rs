@@ -499,25 +499,20 @@ impl ServoGlue {
                 EmbedderMsg::Prompt(definition, origin) => {
                     let cb = &self.callbacks.host_callbacks;
                     let trusted = origin == PromptOrigin::Trusted;
-                    let res = match definition {
+                    match definition {
                         PromptDefinition::Alert(message, sender) => {
-                            sender.send(cb.prompt_alert(message, trusted))
+                            cb.prompt_alert(message, trusted)
                         },
                         PromptDefinition::OkCancel(message, sender) => {
-                            sender.send(cb.prompt_ok_cancel(message, trusted))
+                           cb.prompt_ok_cancel(message, trusted, sender)
                         },
                         PromptDefinition::YesNo(message, sender) => {
-                            sender.send(cb.prompt_yes_no(message, trusted))
+                           cb.prompt_yes_no(message, trusted, sender)
                         },
                         PromptDefinition::Input(message, default, sender) => {
-                            sender.send(cb.prompt_input(message, default, trusted))
+                            cb.prompt_input(message, default, trusted, sender)
                         },
                     };
-                    if let Err(e) = res {
-                        let reason = format!("Failed to send Prompt response: {}", e);
-                        self.events
-                            .push(EmbedderEvent::SendError(browser_id, reason));
-                    }
                 },
                 EmbedderMsg::AllowOpeningWebView(response_chan) => {
                     // Note: would be a place to handle pop-ups config.
@@ -573,14 +568,7 @@ impl ServoGlue {
                         },
                     };
 
-                    let result = match self.callbacks.host_callbacks.prompt_yes_no(message, true) {
-                        PromptResult::Primary => PermissionRequest::Granted,
-                        PromptResult::Secondary | PromptResult::Dismissed => {
-                            PermissionRequest::Denied
-                        },
-                    };
-
-                    let _ = sender.send(result);
+                   self.callbacks.host_callbacks.prompt_permission(message, sender);
                 },
                 EmbedderMsg::ShowIME(kind, text, multiline, bounds) => {
                     self.callbacks

@@ -4542,6 +4542,7 @@ dependencies = [
  "bitflags 2.6.0",
  "ctor",
  "napi-sys-ohos",
+ "tokio",
 ]
 
 [[package]]

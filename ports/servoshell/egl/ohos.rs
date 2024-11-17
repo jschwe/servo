@@ -29,8 +29,9 @@ use ohos_sys::xcomponent::{
 };
 use servo::compositing::windowing::EmbedderEvent;
 use servo::embedder_traits;
-use servo::embedder_traits::{InputMethodType, PromptResult};
+use servo::embedder_traits::{InputMethodType, PermissionRequest, PromptResult};
 use servo::euclid::Point2D;
+use servo::ipc_channel::ipc::IpcSender;
 use servo::style::Zero;
 use simpleservo::EventLoopWaker;
 use xcomponent_sys::{
@@ -128,6 +129,13 @@ static SET_URL_BAR_CB: OnceLock<
 static PROMPT_TOAST: OnceLock<
     ThreadsafeFunction<String, (), String, false, false, PROMPT_QUEUE_SIZE>,
 > = OnceLock::new();
+// message: string, labels: string[], callback: (err: number | null, pressed_button: number | null) => undefined
+static PROMPT_DIALOG: OnceLock<
+    ThreadsafeFunction<(String, Vec<String>), napi_ohos::bindgen_prelude::Promise<u32>, (String, Vec<String>), false, false, PROMPT_QUEUE_SIZE>
+> = OnceLock::new();
+
+
+
 
 impl ServoAction {
     fn dispatch_touch_event(
@@ -531,6 +539,17 @@ pub fn register_prompt_toast_callback(callback: Function<String, ()>) -> napi_oh
 }
 
 #[napi]
+pub fn register_prompt_dialog_callback(callback: Function<(String, Vec<String>), Promise<u32>>) -> napi_ohos::Result<()> {
+    debug!("register_prompt_dialog_callback called!");
+    let mut tsfn_builder = callback.build_threadsafe_function();
+    let function = tsfn_builder.max_queue_size::<PROMPT_QUEUE_SIZE>().build()?;
+
+    PROMPT_DIALOG
+        .set(function)
+        .map_err(|_e| napi_ohos::Error::from_reason("Failed to set prompt dialog callback"))
+}
+
+#[napi]
 pub fn init_servo(init_opts: InitOpts) -> napi_ohos::Result<()> {
     info!("Servo is being initialised with the following Options: ");
     info!(
@@ -685,19 +704,48 @@ impl HostTrait for HostCallbacks {
         }
     }
 
-    fn prompt_yes_no(&self, msg: String, trusted: bool) -> PromptResult {
-        warn!("Prompt not implemented. Cancelled. {}", msg);
-        PromptResult::Secondary
+
+
+    fn prompt_permission(&self, msg: String, result: IpcSender<PermissionRequest>) {
+        warn!("Prompt permission {}", msg);
+        match PROMPT_DIALOG.get() {
+            Some(prompt_fn) => {
+                let button_names = vec!["Grant".to_string(), "Deny".to_string()];
+                // let status = ;
+                tokio::spawn(async move {
+                    match prompt_fn.call_async((msg, button_names)).await {
+                        Ok(button_index) => {
+                            let permission = match button_index.await {
+                                Ok(0) => PermissionRequest::Granted,
+                                Ok(1) => PermissionRequest::Denied,
+                                Ok(_) => { error!("Unexpected button index received in permission prompt"); PermissionRequest::Denied }
+                                Err(e) => { error!("Unexpected error: {e}"); PermissionRequest::Denied }
+                            };
+                            result.send(permission).unwrap(); },
+                        Err(err) => { println!("Prompt permission returned an error")}
+                    }
+                });
+            },
+            None => {
+                error!("PROMPT_DIALOG not set. Dropping msg {msg}");
+                result.send(PermissionRequest::Denied).unwrap()
+            },
+        }
     }
 
-    fn prompt_ok_cancel(&self, msg: String, trusted: bool) -> PromptResult {
-        warn!("Prompt not implemented. Cancelled. {}", msg);
-        PromptResult::Secondary
+    fn prompt_yes_no(&self, msg: String, trusted: bool, result: IpcSender<PromptResult>) {
+        warn!("Prompt yes-no {}", msg);
+        result.send(PromptResult::Secondary).unwrap()
     }
 
-    fn prompt_input(&self, msg: String, default: String, trusted: bool) -> Option<String> {
-        warn!("Input prompt not implemented. Cancelled. {}", msg);
-        Some(default)
+    fn prompt_ok_cancel(&self, msg: String, trusted: bool, result: IpcSender<PromptResult>) {
+        warn!("Prompt ok-cancel {}", msg);
+        result.send(PromptResult::Secondary).unwrap()
+    }
+
+    fn prompt_input(&self, msg: String, default: String, trusted: bool, result: IpcSender<Option<String>>) {
+        warn!("Input prompt: {}", msg);
+        result.send(Some(default)).unwrap()
     }
 
     fn show_context_menu(&self, title: Option<String>, items: Vec<String>) {

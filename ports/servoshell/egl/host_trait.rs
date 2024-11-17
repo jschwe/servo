@@ -2,19 +2,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use servo::embedder_traits::{InputMethodType, MediaSessionPlaybackState, PromptResult};
+use servo::embedder_traits::{InputMethodType, MediaSessionPlaybackState, PermissionRequest, PromptResult};
+use servo::ipc_channel::ipc::IpcSender;
 use servo::webrender_api::units::DeviceIntRect;
 
 /// Callbacks. Implemented by embedder. Called by Servo.
 pub trait HostTrait {
     /// Show alert.
     fn prompt_alert(&self, msg: String, trusted: bool);
+    fn prompt_permission(&self, msg: String, result: IpcSender<PermissionRequest>);
     /// Ask Yes/No question.
-    fn prompt_yes_no(&self, msg: String, trusted: bool) -> PromptResult;
+    fn prompt_yes_no(&self, msg: String, trusted: bool, result: IpcSender<PromptResult>);
     /// Ask Ok/Cancel question.
-    fn prompt_ok_cancel(&self, msg: String, trusted: bool) -> PromptResult;
+    fn prompt_ok_cancel(&self, msg: String, trusted: bool, result: IpcSender<PromptResult>);
     /// Ask for string
-    fn prompt_input(&self, msg: String, default: String, trusted: bool) -> Option<String>;
+    fn prompt_input(&self, msg: String, default: String, trusted: bool, result: IpcSender<Option<String>>);
     /// Show context menu
     fn show_context_menu(&self, title: Option<String>, items: Vec<String>);
     /// Page starts loading.

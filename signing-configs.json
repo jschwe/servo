@@ -1,0 +1,15 @@
+[
+  {
+    "name": "hos",
+    "type": "HarmonyOS",
+    "material": {
+      "certpath": "/Users/jschwender/.ohos/config/hos_ServoDemo_NLnYRtMGk9B2Evqy7I9yq4wa8qImFrUEqzVch9zg3kA=.cer",
+      "storePassword": "0000001B62E4A1D7AC53EECCE3EFD3CFD6A72621DCB78ADBBECF8EC50832DB18C0F3AF8AC62C11CB72E5E3",
+      "keyAlias": "debugKey",
+      "keyPassword": "0000001B02746CCFC8A14E2F2BFE62BFB7ABD28C9AE6801D771832BB0C5925F460386AA11CA24CA6103C0D",
+      "profile": "/Users/jschwender/.ohos/config/hos_ServoDemo_NLnYRtMGk9B2Evqy7I9yq4wa8qImFrUEqzVch9zg3kA=.p7b",
+      "signAlg": "SHA256withECDSA",
+      "storeFile": "/Users/jschwender/.ohos/config/hos_ServoDemo_NLnYRtMGk9B2Evqy7I9yq4wa8qImFrUEqzVch9zg3kA=.p12"
+    }
+  }
+]

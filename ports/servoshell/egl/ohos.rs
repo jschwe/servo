@@ -33,12 +33,13 @@ use servo::embedder_traits::{InputMethodType, PromptResult};
 use servo::style::Zero;
 use simpleservo::EventLoopWaker;
 use xcomponent_sys::{
-    OH_NativeXComponent_GetKeyEventCode, OH_NativeXComponent_KeyAction, OH_NativeXComponent_KeyCode,
+    OH_NativeXComponent_GetKeyEventCode, OH_NativeXComponent_GetXComponentSize,
+    OH_NativeXComponent_KeyAction, OH_NativeXComponent_KeyCode,
 };
 
 use super::gl_glue;
 use super::host_trait::HostTrait;
-use super::servo_glue::ServoGlue;
+use super::servo_glue::{Coordinates, ServoGlue};
 
 mod resources;
 mod simpleservo;
@@ -109,6 +110,10 @@ pub(super) enum ServoAction {
     ImeSendEnter,
     Initialize(Box<InitOpts>),
     Vsync,
+    Resize {
+        width: i32,
+        height: i32,
+    },
 }
 
 /// Queue length for the thread-safe function to submit URL updates to ArkTS
@@ -187,6 +192,9 @@ impl ServoAction {
                 .process_event(EmbedderEvent::Vsync)
                 .and_then(|()| servo.perform_updates())
                 .map(|()| servo.present_if_needed()),
+            Resize { width, height } => {
+                servo.resize(Coordinates::new(0, 0, *width, *height, *width, *height))
+            },
         };
         if let Err(e) = res {
             error!("Failed to do {self:?} with error {e}");
@@ -281,9 +289,52 @@ extern "C" fn on_surface_created_cb(xcomponent: *mut OH_NativeXComponent, window
     info!("Returning from on_surface_created_cb");
 }
 
-// Todo: Probably we need to block here, until the main thread has processed the change.
-extern "C" fn on_surface_changed_cb(_component: *mut OH_NativeXComponent, _window: *mut c_void) {
-    error!("on_surface_changed_cb is currently not implemented!");
+/// Returns the size of the surface
+///
+/// # Safety
+///
+/// `xcomponent` and `native_window` must be valid, non-null and aligned pointers to a
+/// live xcomponent and associated native window surface.
+unsafe fn get_xcomponent_size(
+    xcomponent: *mut OH_NativeXComponent,
+    native_window: *mut c_void,
+) -> Result<euclid::default::Size2D<i32>, i32> {
+    let mut width: u64 = 0;
+    let mut height: u64 = 0;
+    let res = unsafe {
+        OH_NativeXComponent_GetXComponentSize(
+            xcomponent,
+            native_window,
+            &mut width as *mut _,
+            &mut height as *mut _,
+        )
+    };
+    if res != 0 {
+        debug!("OH_NativeXComponent_GetXComponentSize failed with {res}");
+        return Err(res);
+    }
+
+    let width: i32 = width.try_into().expect("Width too large");
+    let height: i32 = height.try_into().expect("Height too large");
+    Ok(euclid::Size2D::new(width, height))
+}
+
+extern "C" fn on_surface_changed_cb(
+    xcomponent: *mut OH_NativeXComponent,
+    native_window: *mut c_void,
+) {
+    debug!("on_surface_changed_cb: xc: {xcomponent:?}, window: {native_window:?}");
+    // SAFETY: We just obtained these pointers from the callback, so we can assume them to be valid.
+    if let Ok(size) = unsafe { get_xcomponent_size(xcomponent, native_window) } {
+        info!("on_surface_changed_cb: Resizing to {size:?}");
+        call(ServoAction::Resize {
+            width: size.width,
+            height: size.height,
+        })
+        .unwrap();
+    } else {
+        error!("on_surface_changed_cb: Surface changed, but failed to obtain new size")
+    }
 }
 
 extern "C" fn on_surface_destroyed_cb(_component: *mut OH_NativeXComponent, _window: *mut c_void) {

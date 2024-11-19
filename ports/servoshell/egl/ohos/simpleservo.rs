@@ -2,13 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 use std::cell::RefCell;
-use std::convert::TryInto;
 use std::os::raw::c_void;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use log::{debug, error, info};
-use ohos_sys::xcomponent::{OH_NativeXComponent, OH_NativeXComponent_GetXComponentSize};
+use ohos_sys::xcomponent::OH_NativeXComponent;
 use servo::compositing::windowing::EmbedderEvent;
 use servo::compositing::CompositeTarget;
 use servo::embedder_traits::resources;
@@ -16,7 +15,6 @@ use servo::embedder_traits::resources;
 /// It will be called to notify embedder that some events are available,
 /// and that perform_updates need to be called
 pub use servo::embedder_traits::EventLoopWaker;
-use servo::euclid::Size2D;
 use servo::servo_config::opts;
 use servo::servo_config::opts::ArgumentParsingResult;
 use servo::servo_url::ServoUrl;
@@ -102,24 +100,13 @@ pub fn init(
         .create_adapter()
         .or(Err("Failed to create adapter"))?;
 
-    let mut width: u64 = 0;
-    let mut height: u64 = 0;
-    let res = unsafe {
-        OH_NativeXComponent_GetXComponentSize(
-            xcomponent,
-            native_window,
-            &mut width as *mut _,
-            &mut height as *mut _,
-        )
+    let Ok(window_size) = (unsafe { super::get_xcomponent_size(xcomponent, native_window) }) else {
+        return Err("Failed to get xcomponent size");
     };
-    assert_eq!(res, 0, "OH_NativeXComponent_GetXComponentSize failed");
-    let width: i32 = width.try_into().expect("Width too large");
-    let height: i32 = height.try_into().expect("Height too large");
 
-    debug!("Creating surfman widget with width {width} and height {height}");
-    let native_widget = unsafe {
-        connection.create_native_widget_from_ptr(native_window, Size2D::new(width, height))
-    };
+    debug!("Creating surfman widget with {window_size:?}");
+    let native_widget =
+        unsafe { connection.create_native_widget_from_ptr(native_window, window_size) };
     let surface_type = SurfaceType::Widget { native_widget };
 
     info!("Creating rendering context");
@@ -130,7 +117,14 @@ pub fn init(
 
     let window_callbacks = Rc::new(ServoWindowCallbacks::new(
         callbacks,
-        RefCell::new(Coordinates::new(0, 0, width, height, width, height)),
+        RefCell::new(Coordinates::new(
+            0,
+            0,
+            window_size.width,
+            window_size.height,
+            window_size.width,
+            window_size.height,
+        )),
         options.display_density as f32,
         rendering_context.clone(),
     ));

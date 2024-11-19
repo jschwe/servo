@@ -231,6 +231,11 @@ impl ServoGlue {
     /// Let Servo know that the window has been resized.
     pub fn resize(&mut self, coordinates: Coordinates) -> Result<(), &'static str> {
         info!("resize");
+        let size = coordinates.viewport.size;
+        self.callbacks
+            .rendering_context
+            .resize(Size2D::new(size.width, size.height))
+            .expect("Can't resize");
         *self.callbacks.coordinates.borrow_mut() = coordinates;
         self.process_event(EmbedderEvent::WindowResize)
     }

@@ -19,8 +19,18 @@ TEST_SERVER_PORT = 8192
 
 # Run servo and print / parse the results for a specific Dromaeo module.
 def run_servo(servo_exe, tests):
-    url = "http://localhost:{0}/dromaeo/web/index.html?{1}&automated&post_json".format(TEST_SERVER_PORT, tests)
-    args = [servo_exe, url, "-z", "-f"]
+    url = "\"http://localhost:{0}/dromaeo/web/index.html?{1}&automated&post_json\"".format(TEST_SERVER_PORT, tests)
+    subprocess.run(["hdc", "shell", "aa", "force-stop", "org.servo.servoshell"], check=True)
+
+    res = subprocess.run(["hdc", "fport", "ls"], check=True, encoding='utf-8', capture_output=True)
+    if f"tcp:{TEST_SERVER_PORT} tcp:{TEST_SERVER_PORT}" not in res.stdout:
+        # Forward the test serverport from the phone to our host
+        res = subprocess.run(["hdc", "rport", f"tcp:{TEST_SERVER_PORT}", f"tcp:{TEST_SERVER_PORT}"], check=True, encoding='utf-8', capture_output=True)
+
+    if "[Fail]" in res.stdout:
+        raise RuntimeError(f"Failed to forward port: stdout: {res.stdout}, stderr: {res.stderr}")
+
+    args = ["hdc", "shell", "aa", "start", "-a", "EntryAbility", "-b" "org.servo.servoshell", "-U", url ] #"--psn=-z", "--psn=-f"]
     return subprocess.Popen(args)
 
 
@@ -37,6 +47,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         global post_data
         self.send_response(200)
+        self.log_message("Finished sending response!")
         self.end_headers()
         self.wfile.write(b"<HTML>POST OK.<BR><BR>")
         length = int(self.headers.get('content-length'))
@@ -44,6 +55,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
         post_data = parameters[b'data']
 
     def log_message(self, format, *args):
+        print(format % args)
         return
 
 
@@ -67,8 +79,11 @@ if __name__ == '__main__':
 
         print("Testing Dromaeo on Servo!")
         proc = run_servo(servo_exe, tests)
+        server.timeout = 10
         while not post_data:
+            print("Before handle request")
             server.handle_request()
+            print("After handle request")
         data = json.loads(post_data[0])
         number = 0
         length = 0

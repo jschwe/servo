@@ -43,7 +43,7 @@ jobs:
       - name: Run app
         # Todo: perhaps load a website from the host?
         run:  |
-          hdc shell aa start -a EntryAbility -b com.servo.demo -U https://servo.org
+          hdc shell aa start -a EntryAbility -b org.servo.servoshell -U https://servo.org --ps=--prefs js.disable_jit=true
           sleep 5
           hdc shell snapshot_display -f /data/local/tmp/servo0.jpeg
           hdc file recv /data/local/tmp/servo0.jpeg  servo_hos_screenshot.jpeg

@@ -38,10 +38,16 @@ jobs:
       - name: Build (arch ${{ matrix.target }} profile
         run: |
           ./mach build --locked --target ${{ matrix.target }} --release --flavor=harmonyos --no-default-features --features tracing --features tracing-hitrace
-          cp -r target/cargo-timings target/cargo-timings-ohos-${{ matrix.target }}
-      - name: Archive build timing
+      - name: Install
+        run: ./mach install --target ${{ matrix.target }} --release --flavor=harmonyos
+      - name: Run app
+        # Todo: perhaps load a website from the host?
+        run:  |
+          hdc shell aa start -a EntryAbility -b com.servo.demo -U https://servo.org
+          sleep 5
+          hdc shell snapshot_display -f /data/local/tmp/servo0.jpeg
+          hdc file recv /data/local/tmp/servo0.jpeg  servo_hos_screenshot.jpeg
+      - name: Upload screenshot
         uses: actions/upload-artifact@v4
         with:
-          name: cargo-timings-ohos-${{ matrix.target }}
-          # Using a wildcard here ensures that the archive includes the path.
-          path: target/cargo-timings-*
+          path: servo_hos_screenshot.jpeg

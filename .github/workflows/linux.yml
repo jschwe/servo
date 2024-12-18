@@ -101,8 +101,17 @@ jobs:
   build:
     needs:
       - runner-select
+      # fixme - seperate jobs for self hosted?
     name: Linux Build [${{ needs.runner-select.outputs.unique-id }}]
     runs-on: ${{ needs.runner-select.outputs.selected-runner-label }}
+    defaults:
+      run:
+        working-directory: /data/servo/servo
+    container:
+      image: ghcr.io/jschwe/servo_ci_testing_${{inputs.profile}}-crown-default_features
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
     steps:
       - uses: actions/checkout@v4
         if: ${{ runner.environment != 'self-hosted' && github.event_name != 'pull_request_target' }}
@@ -132,9 +141,9 @@ jobs:
           version: 14
         # FIXME: It would be better to use the above step for regular Linux jobs
         # and remove the following step, but currenty that is failing and needs investigation.
-      - name: Set LIBCLANG_PATH env # needed for bindgen in mozangle
-        if: ${{ runner.environment != 'self-hosted' && !inputs.upload }} # not needed on ubuntu 20.04 used for nightly
-        run: echo "LIBCLANG_PATH=/usr/lib/llvm-14/lib" >> $GITHUB_ENV
+#      - name: Set LIBCLANG_PATH env # needed for bindgen in mozangle
+#        if: ${{ runner.environment != 'self-hosted' && !inputs.upload }} # not needed on ubuntu 20.04 used for nightly
+#        run: echo "LIBCLANG_PATH=/usr/lib/llvm-14/lib" >> $GITHUB_ENV
       - name: Setup Python
         if: ${{ runner.environment != 'self-hosted' }}
         uses: ./.github/actions/setup-python

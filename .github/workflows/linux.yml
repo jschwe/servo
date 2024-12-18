@@ -108,6 +108,9 @@ jobs:
     runs-on: ${{ needs.runner-select.outputs.selected-runner-label }}
     container:
       image: ghcr.io/jschwe/servo_ci_testing_${{inputs.profile}}-crown-default_features
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
     steps:
       - run: pwd
       - if: ${{ github.event_name != 'pull_request_target' }}
@@ -124,7 +127,6 @@ jobs:
         if: ${{ ! fromJSON(needs.runner-select.outputs.is-self-hosted) && !inputs.upload }} # not needed on ubuntu 20.04 used for nightly
         run: echo "LIBCLANG_PATH=/usr/lib/llvm-14/lib" >> $GITHUB_ENV
       - name: Bootstrap dependencies
-        if: ${{ ! fromJSON(needs.runner-select.outputs.is-self-hosted) }}
         run: |
           sudo apt update
           ./mach bootstrap --skip-lints

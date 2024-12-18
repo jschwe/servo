@@ -1,4 +1,4 @@
-# Dockerfile to build servo with
+# Dockerfile to build servo in CI
 # We use multi-stage builds to reduce the size of the final image and
 # allow parallel building of independant layers
 
@@ -96,27 +96,37 @@ ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 COPY --from=servo_fetcher /data/servo /data/servo
 
 # ideally this should be a no-op: Todo: investigate the layer and see if it is.
-RUN cd /data/servo/servo && ./mach bootstrap --skip-platform
-
+RUN ./mach bootstrap --skip-platform
+# Create a layer which prefetches git dependencies
+RUN cargo update -p mozjs && git checkout Cargo.lock
 
 ########################################################################################
 # Cache Layers #########################################################################
 # Below we define several `servo_cooked` layers, which are intended as the final
 # artifacts for use in CI, with prebuilt servo.
 # Build by running `docker build --target servo_cooked_XXX -t servo_ci_XXX:latest
+# Note: The max layer size is 10GiB
 ########################################################################################
 
+# FROM servo_base AS servo_cooked_dev-crown-default_features
+
+# RUN ./mach build --dev --use-crown
+
+# FROM servo_base AS servo_cooked_release-crown-default_features
+
+# RUN ./mach build --release --use-crown
+
+FROM servo_base AS planner
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+
 FROM servo_base AS servo_cooked_dev-crown-default_features
+COPY --from=planner /data/servo/servo/recipe.json recipe.json
+# Todo: it would be better if we could run `cargo chef` through `./mach exec xxx`, and have
+# mach set the regular environment variables (e.g. CC) to reduce rebuild reasons!
+RUN CARGO_BUILD_RUSTC=crown RUSTFLAGS=--cfg=crown cargo chef cook --profile=dev
 
-RUN ./mach build --dev --use-crown
-
-FROM servo_base AS servo_cooked_release-crown-default_features
-
-RUN ./mach build --release --use-crown
-#FROM servo_base AS planner
-#
-#RUN cargo chef prepare --recipe-path recipe.json
-#
 #
 #FROM servo_base AS servo_cooked_release
 #

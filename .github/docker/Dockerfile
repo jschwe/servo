@@ -11,13 +11,6 @@ RUN apt-get update && \
     ca-certificates unzip curl git jq \
     && apt-get clean
 
-ARG USERNAME=servo_ci
-ARG USER_UID=1000
-ARG USER_GID=${USER_UID}
-
-RUN groupadd --gid ${USER_GID} ${USERNAME} && \
-    useradd -s /bin/bash --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME}
-
 
 FROM base_fetcher AS base_with_cc
 # We need a c-compiler to `cargo install` some of our dependencies
@@ -45,10 +38,9 @@ RUN apt-get update && \
         libxmu6 libegl1-mesa-dev llvm-dev m4 xorg-dev libxkbcommon0 libxkbcommon-x11-0 \
         xvfb gh sudo
 
-RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
+RUN mkdir -p /data/servo/servo
 
 FROM base_with_cc AS rust_toolchain
-USER ${USERNAME}
 ARG RUST_VERSION=1.82.0
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain ${RUST_VERSION} \
@@ -56,13 +48,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         --component rustfmt clippy cargo llvm-tools rustc-dev rustdocs
 
 
-RUN /home/${USERNAME}/.cargo/bin/cargo install cargo-chef taplo-cli cargo-deny --locked
+RUN /root/.cargo/bin/cargo install cargo-chef taplo-cli cargo-deny --locked
 
 ##### FETCH SERVO ####################################################################
 FROM base_fetcher AS servo_fetcher
 
-RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
-USER ${USERNAME}
+RUN mkdir -p /data/servo/servo
 # Clone servo, ignoring the history. We keep a small history, just in case some of our
 # scripts might rely on a bit of history being available.
 RUN cd /data/servo && git clone https://github.com/servo/servo.git --depth 10
@@ -85,13 +76,12 @@ RUN mkdir -p "$HOME/.local/bin" \
 
 FROM base AS servo_base
 
-USER ${USERNAME}
 WORKDIR /data/servo/servo
 
-COPY --chown=${USERNAME}:${USERNAME} --from=rust_toolchain /home/${USERNAME}/.cargo /home/${USERNAME}/.cargo
-COPY --chown=${USERNAME}:${USERNAME} --from=rust_toolchain /home/${USERNAME}/.rustup /home/${USERNAME}/.rustup
-COPY --chown="${USERNAME}:${USERNAME}" --from=uv /root/.local/bin/uv /root/.local/bin/uvx /home/${USERNAME}/.cargo/bin/
-ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
+COPY --from=rust_toolchain /root/.cargo /root/.cargo
+COPY --from=rust_toolchain /root/.rustup /root/.rustup
+COPY --from=uv /root/.local/bin/uv /root/.local/bin/uvx /root/.cargo/bin/
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY --from=servo_fetcher /data/servo /data/servo
 

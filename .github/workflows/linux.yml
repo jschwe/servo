@@ -106,6 +106,9 @@ jobs:
       # fixme - seperate jobs for self hosted?
     name: Linux Build [${{ needs.runner-select.outputs.unique-id }}]
     runs-on: ${{ needs.runner-select.outputs.selected-runner-label }}
+    defaults:
+      run:
+        working-directory: /data/servo/servo
     container:
       image: ghcr.io/jschwe/servo_ci_testing_${{inputs.profile}}-crown-default_features
       credentials:

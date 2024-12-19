@@ -126,9 +126,9 @@ jobs:
           git switch --detach
           git reset --hard FETCH_HEAD
 
-      - name: Set LIBCLANG_PATH env # needed for bindgen in mozangle
-        if: ${{ ! fromJSON(needs.runner-select.outputs.is-self-hosted) && !inputs.upload }} # not needed on ubuntu 20.04 used for nightly
-        run: echo "LIBCLANG_PATH=/usr/lib/llvm-14/lib" >> $GITHUB_ENV
+#      - name: Set LIBCLANG_PATH env # needed for bindgen in mozangle
+#        if: ${{ ! fromJSON(needs.runner-select.outputs.is-self-hosted) && !inputs.upload }} # not needed on ubuntu 20.04 used for nightly
+#        run: echo "LIBCLANG_PATH=/usr/lib/llvm-14/lib" >> $GITHUB_ENV
 #      - name: Bootstrap dependencies
 #        run: |
 #          sudo apt update

@@ -121,7 +121,7 @@ FROM servo_base AS servo_cooked_release-crown-default_features
 COPY --from=planner /data/servo/servo/recipe.json recipe.json
 # Todo: it would be better if we could run `cargo chef` through `./mach exec xxx`, and have
 # mach set the regular environment variables (e.g. CC) to reduce rebuild reasons!
-RUN CARGO_BUILD_RUSTC=crown RUSTFLAGS=--cfg=crown cargo chef cook --profile=release
+RUN CARGO_BUILD_RUSTC=crown RUSTFLAGS=--cfg=crown cargo chef cook --profile=release --features layout-2013
 
 #
 #FROM servo_base AS servo_cooked_release

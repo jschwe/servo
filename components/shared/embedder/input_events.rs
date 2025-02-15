@@ -4,6 +4,7 @@
 
 use euclid::Vector2D;
 use keyboard_types::{CompositionEvent, KeyboardEvent};
+use log::error;
 use malloc_size_of_derive::MallocSizeOf;
 use serde::{Deserialize, Serialize};
 use webrender_api::units::{DeviceIntPoint, DevicePixel, DevicePoint};
@@ -142,7 +143,46 @@ pub struct TouchEvent {
     pub event_type: TouchEventType,
     pub id: TouchId,
     pub point: DevicePoint,
-    pub action: TouchAction,
+    /// An ID for a sequence of touch events between a `Down` and the `Up` or `Cancel` event.
+    sequence_id: Option<u32>,
+    /// The action servo will perform unless an event handler prevents the default action.
+    default_action: Option<TouchAction>,
+}
+
+impl TouchEvent {
+    pub fn new(event_type: TouchEventType, id: TouchId, point: DevicePoint) -> Self {
+        TouchEvent {
+            event_type,
+            id,
+            point,
+            sequence_id: None,
+            default_action: None,
+        }
+    }
+
+    /// Embedders should ignore this.
+    #[doc(hidden)]
+    pub fn init_sequence_id(&mut self, sequence_id: u32) {
+        if self.sequence_id.is_none() {
+            self.sequence_id = Some(sequence_id);
+        } else {
+            // We could allow embedders to set the sequence ID.
+            error!("Sequence ID already set.");
+        }
+    }
+
+    /// Embedders should ignore this
+    #[doc(hidden)]
+    pub fn init_default_action(&mut self, action: TouchAction) {
+        if self.default_action.is_none() {
+            self.default_action = Some(action);
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn expect_sequence_id_and_action(&self) -> (u32, TouchAction) {
+        (self.sequence_id.expect("Sequence ID not initialized"), self.default_action.unwrap_or(TouchAction::NoAction))
+    }
 }
 
 /// Mode to measure WheelDelta floats in

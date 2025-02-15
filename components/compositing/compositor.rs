@@ -1367,28 +1367,25 @@ impl IOCompositor {
                 InputEvent::MouseButton(event) => {
                     match event.action {
                         MouseButtonAction::Click => {},
-                        MouseButtonAction::Down => self.on_touch_down(TouchEvent {
-                            event_type: TouchEventType::Down,
-                            id: TouchId(0),
-                            point: event.point,
-                            action: TouchAction::NoAction,
-                        }),
-                        MouseButtonAction::Up => self.on_touch_up(TouchEvent {
-                            event_type: TouchEventType::Up,
-                            id: TouchId(0),
-                            point: event.point,
-                            action: TouchAction::NoAction,
-                        }),
+                        MouseButtonAction::Down => self.on_touch_down(TouchEvent::new(
+                            TouchEventType::Down,
+                            TouchId(0),
+                            event.point,
+                        )),
+                        MouseButtonAction::Up => self.on_touch_up(TouchEvent::new(
+                            TouchEventType::Up,
+                            TouchId(0),
+                            event.point,
+                        )),
                     }
                     return;
                 },
                 InputEvent::MouseMove(event) => {
-                    self.on_touch_move(TouchEvent {
-                        event_type: TouchEventType::Move,
-                        id: TouchId(0),
-                        point: event.point,
-                        action: TouchAction::NoAction,
-                    });
+                    self.on_touch_move(TouchEvent::new(
+                        TouchEventType::Move,
+                        TouchId(0),
+                        event.point,
+                    ));
                     return;
                 },
                 _ => {},
@@ -1447,10 +1444,13 @@ impl IOCompositor {
             .collect()
     }
 
-    fn send_touch_event(&self, event: TouchEvent) {
+    fn send_touch_event(&self, mut event: TouchEvent, default_action: TouchAction) {
         let Some(result) = self.hit_test_at_point(event.point) else {
             return;
         };
+
+        event.init_sequence_id(self.touch_handler.sequence_id);
+        event.init_default_action(default_action);
 
         let event = InputEvent::Touch(event);
         if let Err(e) = self
@@ -1476,13 +1476,13 @@ impl IOCompositor {
 
     fn on_touch_down(&mut self, event: TouchEvent) {
         self.touch_handler.on_touch_down(event.id, event.point);
-        self.send_touch_event(event);
+        self.send_touch_event(event, TouchAction::NoAction);
     }
 
-    fn on_touch_move(&mut self, mut event: TouchEvent) {
+    fn on_touch_move(&mut self, event: TouchEvent) {
         let action: TouchAction = self.touch_handler.on_touch_move(event.id, event.point);
         if TouchAction::NoAction != action {
-            if !self.touch_handler.prevent_move {
+            if self.touch_handler.move_allowed(self.touch_handler.sequence_id) {
                 match action {
                     TouchAction::Scroll(delta, point) => self.on_scroll_window_event(
                         ScrollLocation::Delta(LayoutVector2D::from_untyped(delta.to_untyped())),
@@ -1507,46 +1507,46 @@ impl IOCompositor {
                     },
                     _ => {},
                 }
-            } else {
-                event.action = action;
             }
-            self.send_touch_event(event);
+            self.send_touch_event(event, action);
         }
     }
 
-    fn on_touch_up(&mut self, mut event: TouchEvent) {
+    fn on_touch_up(&mut self, event: TouchEvent) {
         let action = self.touch_handler.on_touch_up(event.id, event.point);
-        event.action = action;
-        self.send_touch_event(event);
+        self.send_touch_event(event, action);
     }
 
-    fn on_touch_cancel(&mut self, event: TouchEvent) {
-        // Send the event to script.
+    fn on_touch_cancel(&mut self, event: TouchEvent){
         self.touch_handler.on_touch_cancel(event.id, event.point);
-        self.send_touch_event(event)
+        self.send_touch_event(event, TouchAction::NoAction)
     }
 
     fn on_touch_event_processed(&mut self, result: EventResult) {
+        info!("Received processed touch event: {:?}", result);
         match result {
-            EventResult::DefaultPrevented(event_type) => {
-                match event_type {
+            EventResult::DefaultPrevented {sequence_id, kind} => {
+                match kind {
                     TouchEventType::Down | TouchEventType::Move => {
-                        self.touch_handler.prevent_move = true;
+                        self.touch_handler.prevent_move(sequence_id);
                     },
                     _ => {},
                 }
-                self.touch_handler.prevent_click = true;
+                self.touch_handler.prevent_click(sequence_id);
             },
-            EventResult::DefaultAllowed(action) => {
-                self.touch_handler.prevent_move = false;
+            EventResult::DefaultAllowed { sequence_id, action} => {
+                self.touch_handler.allow_move(sequence_id);
                 match action {
                     TouchAction::Click(point) => {
-                        if !self.touch_handler.prevent_click {
+                        if self.touch_handler.click_allowed(sequence_id) {
                             self.simulate_mouse_click(point);
                         }
                     },
+                    // if script is blocked and the event handlers for move take long,
+                    // then prevent_move may not have been received yet, by the time the
+                    // touch_up event happened.
                     TouchAction::Flinging(velocity, point) => {
-                        self.touch_handler.on_fling(velocity, point);
+                        // todo: What do we need to do now? Do we e
                     },
                     TouchAction::Scroll(delta, point) => self.on_scroll_window_event(
                         ScrollLocation::Delta(LayoutVector2D::from_untyped(delta.to_untyped())),

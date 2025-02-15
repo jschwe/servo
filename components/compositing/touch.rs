@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+use std::collections::HashMap;
 use embedder_traits::{TouchAction, TouchId};
 use euclid::{Point2D, Scale, Vector2D};
 use log::{debug, warn};
@@ -24,8 +24,16 @@ const FLING_MAX_SCREEN_PX: f32 = 4000.0;
 pub struct TouchHandler {
     pub state: TouchState,
     pub active_touch_points: Vec<TouchPoint>,
-    pub prevent_move: bool,
-    pub prevent_click: bool,
+    // Todo: We should replace this with a fixed size ringbuffer
+    // There is no theoretical limit, but practically we should probably just discard
+    // events, if the handler takes so long that multiple new sequences have already started!
+    prevent_default_map: HashMap<u32, PreventDefaultState>,
+    pub sequence_id: u32,
+}
+
+struct PreventDefaultState {
+    prevent_move: bool,
+    prevent_click: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +59,12 @@ pub enum TouchState {
     /// A single touch point is active and has started panning.
     Panning {
         velocity: Vector2D<f32, DevicePixel>,
+        // Each pan should start with `cancellable = trye`.
+        // Once the first move has been processed by script, and if the
+        // default action was not prevented, we can transition to
+        // non-cancellable events, and directly perform the pan without
+        // waiting for script.
+        //cancellable: bool,
     },
     /// No active touch points, but there is still scrolling velocity
     Flinging {
@@ -68,27 +82,53 @@ pub(crate) struct FlingAction {
     pub cursor: DeviceIntPoint,
 }
 
+// todo: double check if this is per-webview  / document or global.
 impl TouchHandler {
     pub fn new() -> Self {
         TouchHandler {
             state: Nothing,
             active_touch_points: Vec::new(),
-            prevent_move: true,
-            prevent_click: false,
+            prevent_default_map: Default::default(),
+            sequence_id: 1,
         }
     }
+
+    pub(crate) fn prevent_click(&mut self, sequence_id: u32) {
+        self.prevent_default_map.get_mut(&sequence_id).unwrap().prevent_click = true;
+    }
+    pub(crate) fn prevent_move(&mut self, sequence_id: u32) {
+        self.prevent_default_map.get_mut(&sequence_id).unwrap().prevent_move = true;
+    }
+    pub(crate) fn allow_move(&mut self, sequence_id: u32) {
+        self.prevent_default_map.get_mut(&sequence_id).unwrap().prevent_move = false;
+    }
+
+    pub(crate) fn click_allowed(&mut self, sequence_id: u32) -> bool {
+        !self.prevent_default_map.get(&sequence_id).unwrap().prevent_click
+    }
+
+    pub(crate) fn move_allowed(&mut self, sequence_id: u32) -> bool {
+        !self.prevent_default_map.get(&sequence_id).unwrap().prevent_move
+    }
+
 
     pub fn on_touch_down(&mut self, id: TouchId, point: Point2D<f32, DevicePixel>) {
         let point = TouchPoint::new(id, point);
         self.active_touch_points.push(point);
-        self.state = Touching;
-        self.prevent_click = match self.touch_count() {
-            1 => {
-                self.prevent_move = true;
-                false
-            },
-            _ => true,
-        };
+        if self.touch_count() == 1 {
+            self.state = Touching;
+            self.sequence_id = self.sequence_id.wrapping_add(1);
+            let old = self.prevent_default_map.insert(self.sequence_id, PreventDefaultState {
+                prevent_click: false,
+                // current kind of abused as "cancellable" flag
+                prevent_move: true,
+            });
+            assert!(old.is_none());
+        } else {
+            // do we need to transition the state if we already a touch point down?
+            // or will touch_move do that anyway.
+        }
+
     }
 
     pub fn on_vsync(&mut self) -> Option<FlingAction> {
@@ -137,7 +177,7 @@ impl TouchHandler {
                     self.state = Panning {
                         velocity: Vector2D::new(delta.x, delta.y),
                     };
-                    self.prevent_click = true;
+                    self.prevent_click(self.sequence_id);
                     TouchAction::Scroll(delta, point)
                 } else {
                     TouchAction::NoAction
@@ -202,7 +242,7 @@ impl TouchHandler {
                     }
                 } else {
                     self.state = Nothing;
-                    if !self.prevent_click {
+                    if self.click_allowed(self.sequence_id) {
                         TouchAction::Click(point)
                     } else {
                         TouchAction::NoAction

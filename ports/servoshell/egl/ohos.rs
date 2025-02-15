@@ -323,7 +323,7 @@ extern "C" fn on_surface_destroyed_cb(_component: *mut OH_NativeXComponent, _win
 }
 
 extern "C" fn on_dispatch_touch_event_cb(component: *mut OH_NativeXComponent, window: *mut c_void) {
-    info!("DispatchTouchEvent");
+    // info!("DispatchTouchEvent");
     let mut touch_event: MaybeUninit<OH_NativeXComponent_TouchEvent> = MaybeUninit::uninit();
     let res =
         unsafe { OH_NativeXComponent_GetTouchEvent(component, window, touch_event.as_mut_ptr()) };
@@ -656,7 +656,7 @@ impl EventLoopWaker for WakeupCallback {
     }
 
     fn wake(&self) {
-        info!("wake called!");
+        trace!("wake called!");
         self.chan.send(ServoAction::WakeUp).unwrap_or_else(|e| {
             error!("Failed to send wake message with: {e}");
         });

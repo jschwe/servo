@@ -66,9 +66,19 @@ impl fmt::Debug for LayoutMsg {
 #[derive(Debug, Deserialize, Serialize)]
 pub enum EventResult {
     /// Allowed by web content
-    DefaultAllowed(TouchAction),
+    DefaultAllowed{
+        /// Sequence ID for the touch event
+        sequence_id: u32,
+        /// The action that was allowed
+        action: TouchAction
+    },
     /// Prevented by web content
-    DefaultPrevented(TouchEventType),
+    DefaultPrevented {
+        /// Sequence ID for the touch event
+        sequence_id: u32,
+        /// The event type
+        kind: TouchEventType
+    },
 }
 
 /// A log entry reported to the constellation

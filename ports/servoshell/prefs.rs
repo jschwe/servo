@@ -422,7 +422,7 @@ pub(crate) fn parse_command_line_arguments(args: Vec<String>) -> ArgumentParsing
     let filters = opt_match.opt_strs("tracing-filter").join(",");
     let tracing_filter = filters.is_empty().then_some(filters);
 
-    let filters = opt_match.opt_strs("logging-filter").join(",");
+    let filters = opt_match.opt_strs("log-filter").join(",");
     let log_filter = filters.is_empty().then_some(filters);
 
     let mut debug_options = DebugOptions::default();

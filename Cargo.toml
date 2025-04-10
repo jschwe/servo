@@ -241,3 +241,5 @@ codegen-units = 1
 #
 # [patch."https://github.com/servo/<repository>"]
 # <crate> = { path = "/path/to/local/checkout" }
+# [patch.crates-io]
+hilog = { git = "https://github.com/PartiallyUntyped/hilog.git", rev = "607b29d49dd13a4641444635af38a3594582962e"}

@@ -4,9 +4,10 @@
 
 //! Enum wrappers to be able to select different channel implementations at runtime.
 
-use std::fmt;
 use std::fmt::Display;
+use std::hint::black_box;
 use std::marker::PhantomData;
+use std::{fmt, ptr};
 
 use ipc_channel::ipc::IpcError;
 use ipc_channel::router::ROUTER;
@@ -74,7 +75,9 @@ impl<T: Serialize> Serialize for GenericSender<T> {
                     ));
                 } // We know everything is in one address-space, so we can "serialize" the sender by
                 // sending a leaked Box pointer.
-                let sender_clone_addr = Box::leak(Box::new(sender.clone())) as *mut _ as usize;
+                let leaked_sender = Box::leak(Box::new(sender.clone()))
+                    as *mut crossbeam_channel::Sender<Result<T, ipc_channel::Error>>;
+                let sender_clone_addr = leaked_sender.expose_provenance();
                 s.serialize_newtype_variant("GenericSender", 1, "Crossbeam", &sender_clone_addr)
             },
         }
@@ -115,7 +118,9 @@ impl<'de, T: Serialize + Deserialize<'de>> serde::de::Visitor<'de> for GenericSe
                     ));
                 }
                 let addr = variant_data.newtype_variant::<usize>()?;
-                let ptr = addr as *mut crossbeam_channel::Sender<Result<T, ipc_channel::Error>>;
+                let addr = black_box(addr);
+                let ptr: *mut crossbeam_channel::Sender<Result<T, ipc_channel::Error>> =
+                    ptr::with_exposed_provenance_mut(addr);
                 // SAFETY: We know we are in the same address space as the sender, so we can safely
                 // reconstruct the Box.
                 #[allow(unsafe_code)]

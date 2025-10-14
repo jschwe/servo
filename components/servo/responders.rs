@@ -15,6 +15,9 @@ pub(crate) struct ServoErrorSender {
     sender: Sender<ServoError>,
 }
 
+
+
+
 impl ServoErrorSender {
     pub(crate) fn raise_response_send_error(&self, error: generic_channel::SendError) {
         if let Err(error) = self.sender.send(ServoError::ResponseFailedToSend(error)) {

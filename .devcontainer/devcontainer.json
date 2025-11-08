@@ -1,8 +1,5 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
-// Known issues:
-// - The `.venv` folder is shared between host and container, and needs to be deleted
-//   and recreated when switching between host and container.
 {
 	"name": "Ubuntu",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
@@ -26,7 +23,15 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "./mach bootstrap"
+	// This takes more time on the first run compared to pulling a prebuilt image layer,
+	// but makes sure the bootstrapped dependencies are always up to date.
+	"postCreateCommand": 
+		"uv venv /home/vscode/.servo_venv && ./mach bootstrap --force && echo 'test -z \"$VIRTUAL_ENV\" && source $HOME/.servo_venv/bin/activate' >> $HOME/.bashrc",
+
+	"containerEnv": {
+		"CC": "clang",
+		"CXX": "clang++"
+	}
 
 	// Configure tool-specific properties.
 	// "customizations": {},

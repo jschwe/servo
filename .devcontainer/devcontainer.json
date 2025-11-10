@@ -9,7 +9,7 @@
 			"version": "1.91",
 			"profile": "default",
 			"targets": "aarch64-unknown-linux-gnu",
-			"components": "rust-analyzer,rust-src,rustfmt,clippy"
+			"components": "clippy,llvm-tools,rustc-dev,rust-analyzer,rust-src,rustfmt"
 		},
 		"ghcr.io/devcontainers-extra/features/uv:1": {
 			"version": "latest"

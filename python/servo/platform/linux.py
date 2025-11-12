@@ -26,19 +26,51 @@ from .build_target import BuildTarget
 # 3. copy(`sudo apt install ${APT_PKGS.join(" ")}`)
 # 4. paste into https://github.com/servo/book/edit/main/src/hacking/setting-up-your-environment.md
 APT_PKGS = [
-    "build-essential",
-    "ccache",
+    # newly added: 
+    "fontconfig",
+    "libfontconfig1-dev"
+
     "clang",
     "cmake",
     "curl",
-    "g++",
     "git",
-    "gperf",
-    "libdbus-1-dev",
+    # "gperf",
+    # "libdbus-1-dev",
     "libfreetype6-dev",
-    "libgl1-mesa-dri",
-    "libgles2-mesa-dev",
+    #"libgl1-mesa-dri",
+    #"libgles2-mesa-dev",
+    # todo: direct dependency?
     "libglib2.0-dev",
+    #"libges-1.0-dev",
+    "libharfbuzz-dev",
+    "liblzma-dev",
+    "libudev-dev",
+    "libunwind-dev",
+    # "libvulkan1",
+    # todo: do we need that? 
+    #"libx11-dev",
+    #"libxcb-render0-dev",
+    #"libxcb-shape0-dev",
+    #"libxcb-xfixes0-dev",
+    #"libxmu-dev",
+    #"libxmu6",
+    #"libegl1-mesa-dev",
+    "llvm-dev",
+    # "m4",
+    # "xorg-dev",
+    "libxkbcommon0",
+    # "libxkbcommon-x11-0",
+]
+
+# Debatable: 
+
+# ccache
+
+APT_CONVENIENCE = [
+    ""
+]
+
+APT_GSTREAMER_PKGS = [
     "gstreamer1.0-plugins-good",
     "libgstreamer-plugins-good1.0-dev",
     "gstreamer1.0-plugins-bad",
@@ -49,24 +81,6 @@ APT_PKGS = [
     "gstreamer1.0-libav",
     "libgstrtspserver-1.0-dev",
     "gstreamer1.0-tools",
-    "libges-1.0-dev",
-    "libharfbuzz-dev",
-    "liblzma-dev",
-    "libudev-dev",
-    "libunwind-dev",
-    "libvulkan1",
-    "libx11-dev",
-    "libxcb-render0-dev",
-    "libxcb-shape0-dev",
-    "libxcb-xfixes0-dev",
-    "libxmu-dev",
-    "libxmu6",
-    "libegl1-mesa-dev",
-    "llvm-dev",
-    "m4",
-    "xorg-dev",
-    "libxkbcommon0",
-    "libxkbcommon-x11-0",
 ]
 
 # https://packages.fedoraproject.org

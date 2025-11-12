@@ -25,12 +25,14 @@
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// This takes more time on the first run compared to pulling a prebuilt image layer,
 	// but makes sure the bootstrapped dependencies are always up to date.
+	// todo: try UV_PYTHON_INSTALL_DIR (https://docs.astral.sh/uv/concepts/python-versions/#discovery-of-python-versions)
 	"postCreateCommand": 
-		"uv venv /home/vscode/.servo_venv && ./mach bootstrap --force && echo 'test -z \"$VIRTUAL_ENV\" && source $HOME/.servo_venv/bin/activate' >> $HOME/.bashrc",
+		"./mach bootstrap --force",
 
 	"containerEnv": {
 		"CC": "clang",
-		"CXX": "clang++"
+		"CXX": "clang++",
+		"UV_PYTHON_INSTALL_DIR": "/home/vscode/.servo_venv"
 	}
 
 	// Configure tool-specific properties.

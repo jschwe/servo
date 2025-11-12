@@ -15,6 +15,11 @@
 			"version": "latest"
 		}
 	},
+	// Uncomment the following when using podman (rootless docker)
+	// Update the uid and gid, to your local users uid and gid (run `echo $UID` and `echo $GID`)
+	// "runArgs": ["--userns=keep-id:uid=1000,gid=1000"],
+	// "containerUser": "vscode",
+	// "updateRemoteUserUID": true,
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},

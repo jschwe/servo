@@ -141,35 +141,19 @@ jobs:
     steps:
       - name: Success
         if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-              const url = context.serverUrl +
-                "/" + context.repo.owner +
-                "/" + context.repo.repo +
-                "/actions/runs/" + context.runId;
-              const formattedURL = "[#" + context.runId + "](" + url + ")";
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: "✨ Try run (" + formattedURL + ") " + "succeeded.",
-              });
+        run: |
+          formatted_url= "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh pr comment ${PR_NUMBER} --body 
+            "⚠️ Try run ( ${formatted_url} ) failed."
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Failure
         if: ${{ contains(needs.*.result, 'failure') }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-              const url = context.serverUrl +
-                "/" + context.repo.owner +
-                "/" + context.repo.repo +
-                "/actions/runs/" + context.runId;
-              const formattedURL = "[#" + context.runId + "](" + url + ")";
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: "⚠️ Try run (" + formattedURL + ") " + "failed.",
-              });
-
-
+        run: |
+          formatted_url= "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh pr comment ${PR_NUMBER} --body 
+            "️️ Try run ( ${formatted_url} ) succeeded."
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

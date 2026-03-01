@@ -42,6 +42,7 @@ from servo.platform.build_target import AndroidTarget, BuildTarget, OpenHarmonyT
 from servo.util import download_file, get_default_cache_dir
 
 from python.servo.platform.build_target import SanitizerKind
+from python.servo.sanitizer import configure_sanitizer_environment
 from python.servo.util import get_target_dir
 
 NIGHTLY_REPOSITORY_URL = "https://servo-builds2.s3.amazonaws.com/"
@@ -479,7 +480,7 @@ class CommandBase(object):
     def msvc_package_dir(self, package: str) -> str:
         return servo.platform.windows.get_dependency_dir(package)
 
-    def build_env(self) -> dict[str, str]:
+    def build_env(self, sanitizer: SanitizerKind = SanitizerKind.NONE) -> dict[str, str]:
         """Return an extended environment dictionary."""
         env = os.environ.copy()
 
@@ -540,6 +541,9 @@ class CommandBase(object):
             # Increase stylo thread stack size to 2 MiB for debug builds since the stack usage is higher
             # and crashes have been reported. The default is 512 KiB.
             env["SERVO_STYLE_THREAD_STACK_SIZE_KB"] = env.get("SERVO_STYLE_THREAD_STACK_SIZE_KB", str(2 * 1024))
+
+        if sanitizer.is_some():
+            configure_sanitizer_environment(env, self.target.triple(), sanitizer, self.features)
 
         return env
 

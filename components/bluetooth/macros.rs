@@ -9,11 +9,8 @@ macro_rules! get_inner_and_call(
             &$enum_type::Bluez(ref bluez) => bluez.$function_name(),
             #[cfg(all(target_os = "android", feature = "native-bluetooth"))]
             &$enum_type::Android(ref android) => android.$function_name(),
-            #[cfg(all(target_os = "macos", feature = "native-bluetooth"))]
-            &$enum_type::Mac(ref mac) => mac.$function_name(),
             #[cfg(not(any(all(target_os = "linux", feature = "native-bluetooth"),
-                          all(target_os = "android", feature = "native-bluetooth"),
-                          all(target_os = "macos", feature = "native-bluetooth"))))]
+                          all(target_os = "android", feature = "native-bluetooth"))))]
             &$enum_type::Empty(ref empty) => empty.$function_name(),
             #[cfg(feature = "bluetooth-test")]
             &$enum_type::Mock(ref fake) => fake.$function_name(),
@@ -26,11 +23,8 @@ macro_rules! get_inner_and_call(
             &$enum_type::Bluez(ref bluez) => bluez.$function_name(None),
             #[cfg(all(target_os = "android", feature = "native-bluetooth"))]
             &$enum_type::Android(ref android) => android.$function_name(),
-            #[cfg(all(target_os = "macos", feature = "native-bluetooth"))]
-            &$enum_type::Mac(ref mac) => mac.$function_name(),
             #[cfg(not(any(all(target_os = "linux", feature = "native-bluetooth"),
-                          all(target_os = "android", feature = "native-bluetooth"),
-                          all(target_os = "macos", feature = "native-bluetooth"))))]
+                          all(target_os = "android", feature = "native-bluetooth"))))]
             &$enum_type::Empty(ref empty) => empty.$function_name(),
             #[cfg(feature = "bluetooth-test")]
             &$enum_type::Mock(ref fake) => fake.$function_name(),
@@ -43,11 +37,8 @@ macro_rules! get_inner_and_call(
             &$enum_type::Bluez(ref bluez) => bluez.$function_name($value),
             #[cfg(all(target_os = "android", feature = "native-bluetooth"))]
             &$enum_type::Android(ref android) => android.$function_name($value),
-            #[cfg(all(target_os = "macos", feature = "native-bluetooth"))]
-            &$enum_type::Mac(ref mac) => mac.$function_name($value),
             #[cfg(not(any(all(target_os = "linux", feature = "native-bluetooth"),
-                          all(target_os = "android", feature = "native-bluetooth"),
-                          all(target_os = "macos", feature = "native-bluetooth"))))]
+                          all(target_os = "android", feature = "native-bluetooth"))))]
             &$enum_type::Empty(ref empty) => empty.$function_name($value),
             #[cfg(feature = "bluetooth-test")]
             &$enum_type::Mock(ref fake) => fake.$function_name($value),
@@ -60,11 +51,8 @@ macro_rules! get_inner_and_call(
             &$enum_type::Bluez(ref bluez) => bluez.$function_name($value, None),
             #[cfg(all(target_os = "android", feature = "native-bluetooth"))]
             &$enum_type::Android(ref android) => android.$function_name($value),
-            #[cfg(all(target_os = "macos", feature = "native-bluetooth"))]
-            &$enum_type::Mac(ref mac) => mac.$function_name($value),
             #[cfg(not(any(all(target_os = "linux", feature = "native-bluetooth"),
-                          all(target_os = "android", feature = "native-bluetooth"),
-                          all(target_os = "macos", feature = "native-bluetooth"))))]
+                          all(target_os = "android", feature = "native-bluetooth"))))]
             &$enum_type::Empty(ref empty) => empty.$function_name($value),
             #[cfg(feature = "bluetooth-test")]
             &$enum_type::Mock(ref fake) => fake.$function_name($value),

@@ -7,7 +7,6 @@ pub mod bluetooth;
 #[cfg(not(any(
     all(target_os = "linux", feature = "native-bluetooth"),
     all(target_os = "android", feature = "native-bluetooth"),
-    all(target_os = "macos", feature = "native-bluetooth")
 )))]
 mod empty;
 mod macros;

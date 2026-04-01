@@ -41,8 +41,6 @@ use surfman::Device;
 use surfman::chains::SwapChains;
 use webgl::WebGLComm;
 use webgl::webgl_thread::WebGLContextBusyMap;
-#[cfg(feature = "webgpu")]
-use webgpu::canvas_context::WebGpuExternalImageMap;
 use webrender::{CaptureBits, MemoryReport};
 use webrender_api::units::{DevicePixel, DevicePoint};
 use webrender_api::{FontInstanceKey, FontKey, ImageKey};
@@ -131,10 +129,6 @@ pub struct Paint {
     /// Some XR devices want to run on the main thread.
     #[cfg(feature = "webxr")]
     webxr_main_thread: RefCell<webxr::MainThreadRegistry>,
-
-    /// An map of external images shared between all `WebGpuExternalImages`.
-    #[cfg(feature = "webgpu")]
-    webgpu_image_map: std::cell::OnceCell<WebGpuExternalImageMap>,
 }
 
 /// Why we need to be repainted. This is used for debugging.
@@ -212,8 +206,6 @@ impl Paint {
             busy_webgl_contexts_map: busy_webgl_context_map,
             #[cfg(feature = "webxr")]
             webxr_main_thread: RefCell::new(webxr_main_thread),
-            #[cfg(feature = "webgpu")]
-            webgpu_image_map: Default::default(),
         }))
     }
 
@@ -315,11 +307,6 @@ impl Paint {
     #[cfg(feature = "webxr")]
     pub fn webxr_main_thread_registry(&self) -> webxr_api::Registry {
         self.webxr_main_thread.borrow().registry()
-    }
-
-    #[cfg(feature = "webgpu")]
-    pub fn webgpu_image_map(&self) -> WebGpuExternalImageMap {
-        self.webgpu_image_map.get_or_init(Default::default).clone()
     }
 
     pub fn webviews_needing_repaint(&self) -> Vec<WebViewId> {

@@ -82,6 +82,36 @@ def get_rustc_llvm_version() -> Optional[list[int]]:
 
 @CommandProvider
 class MachCommands(CommandBase):
+    def build_webgpu_plugin(
+        self,
+        build_type: BuildType,
+        jobs: str | None,
+        env: dict[str, Any],
+        verbose: bool,
+        very_verbose: bool,
+        **kwargs: Any,
+    ) -> int:
+        opts = ["-p", "servo-webgpu-plugin"]
+
+        if build_type.is_release():
+            opts += ["--release"]
+        elif build_type.is_dev():
+            pass
+        else:
+            opts += ["--profile", build_type.profile]
+
+        if jobs is not None:
+            opts += ["-j", jobs]
+        if verbose:
+            opts += ["-v"]
+        if very_verbose:
+            opts += ["-vv"]
+
+        print("Building the WebGPU plugin.")
+        status = self.run_cargo_build_like_command("build", opts, env=env, verbose=verbose, **kwargs)
+        assert isinstance(status, int)
+        return status
+
     @Command("build", description="Build Servo", category="build")
     @CommandArgument("--jobs", "-j", default=None, help="Number of jobs to run in parallel")
     @CommandArgument(
@@ -165,6 +195,22 @@ class MachCommands(CommandBase):
         status = self.run_cargo_build_like_command("rustc", opts, env=env, verbose=verbose, **kwargs)
 
         if status == 0:
+            if not self.target.needs_packaging():
+                status = self.build_webgpu_plugin(
+                    build_type,
+                    jobs,
+                    env,
+                    verbose,
+                    very_verbose,
+                    **kwargs,
+                )
+
+            if status != 0:
+                elapsed = time() - build_start
+                elapsed_delta = datetime.timedelta(seconds=int(elapsed))
+                print(f"Failed in {elapsed_delta}")
+                return status
+
             if not no_package and self.target.needs_packaging():
                 return_value = Registrar.dispatch(
                     "package", context=self.context, build_type=build_type, flavor=flavor, sanitizer=sanitizer

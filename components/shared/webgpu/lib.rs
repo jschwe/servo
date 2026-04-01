@@ -10,7 +10,9 @@ pub mod render_commands;
 use std::ops::Range;
 
 use malloc_size_of_derive::MallocSizeOf;
+use paint_api::{CrossProcessPaintApi, WebRenderExternalImageApi, WebRenderExternalImageIdManager};
 use serde::{Deserialize, Serialize};
+pub use servo_base::generic_channel::GenericReceiver;
 use servo_base::generic_channel::{GenericOneshotSender, GenericSender, GenericSharedMemory};
 use webrender_api::euclid::default::Size2D;
 use webrender_api::{ImageDescriptor, ImageDescriptorFlags, ImageFormat};
@@ -32,6 +34,7 @@ pub use crate::messages::*;
 pub use crate::render_commands::*;
 
 pub const PRESENTATION_BUFFER_COUNT: usize = 10;
+pub const WEBGPU_PLUGIN_API_VERSION: u32 = 1;
 
 pub type WebGPUAdapterResponse = Option<Result<Adapter, String>>;
 pub type WebGPUComputePipelineResponse = Result<Pipeline<ComputePipelineId>, Error>;
@@ -47,6 +50,30 @@ impl WebGPU {
             .send(WebGPURequest::Exit(sender))
             .map_err(|_| "Failed to send Exit message")
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct WebGpuPluginMetadata {
+    pub api_version: u32,
+    pub package_version: &'static str,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct WebGpuThreadConfig {
+    pub wgpu_backend: String,
+}
+
+pub trait WebGpuPlugin: Send + Sync {
+    fn metadata(&self) -> WebGpuPluginMetadata;
+
+    fn create_external_image_handler(&self) -> Box<dyn WebRenderExternalImageApi>;
+
+    fn start_webgpu_thread(
+        &self,
+        paint_api: CrossProcessPaintApi,
+        webrender_external_image_id_manager: WebRenderExternalImageIdManager,
+        config: WebGpuThreadConfig,
+    ) -> Option<(WebGPU, GenericReceiver<WebGPUMsg>)>;
 }
 
 #[derive(Debug, Deserialize, Serialize)]

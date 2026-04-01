@@ -1164,8 +1164,6 @@ fn create_constellation(
         webxr_registry: None,
         webgl_threads: Some(paint.webgl_threads()),
         webrender_external_image_id_manager: paint.webrender_external_image_id_manager(),
-        #[cfg(feature = "webgpu")]
-        wgpu_image_map: paint.webgpu_image_map(),
         async_runtime,
         privileged_urls,
     };

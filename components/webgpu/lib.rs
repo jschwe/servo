@@ -6,7 +6,7 @@ use canvas_context::WebGpuExternalImageMap;
 pub use canvas_context::{ContextData, WebGpuExternalImages};
 use log::warn;
 use servo_base::generic_channel::{self, GenericReceiver};
-use webgpu_traits::{WebGPU, WebGPUMsg};
+use webgpu_traits::{WebGPU, WebGPUMsg, WebGpuThreadConfig};
 use wgpu_thread::WGPU;
 pub use {wgpu_core as wgc, wgpu_types as wgt};
 
@@ -16,7 +16,6 @@ mod wgpu_thread;
 use std::borrow::Cow;
 
 use paint_api::{CrossProcessPaintApi, WebRenderExternalImageIdManager};
-use servo_config::pref;
 
 pub mod canvas_context;
 
@@ -24,10 +23,8 @@ pub fn start_webgpu_thread(
     paint_api: CrossProcessPaintApi,
     webrender_external_image_id_manager: WebRenderExternalImageIdManager,
     wgpu_image_map: WebGpuExternalImageMap,
+    config: WebGpuThreadConfig,
 ) -> Option<(WebGPU, GenericReceiver<WebGPUMsg>)> {
-    if !pref!(dom_webgpu_enabled) {
-        return None;
-    }
     let (sender, receiver) = match generic_channel::channel() {
         Some(sender_and_receiver) => sender_and_receiver,
         None => {
@@ -55,6 +52,7 @@ pub fn start_webgpu_thread(
                 paint_api,
                 webrender_external_image_id_manager,
                 wgpu_image_map,
+                config,
             )
             .run();
         })

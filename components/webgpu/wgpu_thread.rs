@@ -13,11 +13,10 @@ use paint_api::{CrossProcessPaintApi, WebRenderExternalImageIdManager, WebRender
 use rustc_hash::FxHashMap;
 use servo_base::generic_channel::{GenericReceiver, GenericSender, GenericSharedMemory};
 use servo_base::id::PipelineId;
-use servo_config::pref;
 use webgpu_traits::{
     Adapter, ComputePassId, DeviceLostReason, Error, ErrorScope, Mapping, Pipeline, PopError,
     RenderPassId, ShaderCompilationInfo, WebGPU, WebGPUAdapter, WebGPUContextId, WebGPUDevice,
-    WebGPUMsg, WebGPUQueue, WebGPURequest, apply_render_command,
+    WebGPUMsg, WebGPUQueue, WebGPURequest, WebGpuThreadConfig, apply_render_command,
 };
 use webrender_api::ExternalImageId;
 use wgc::command::{ComputePass, ComputePassDescriptor, RenderPass};
@@ -121,8 +120,9 @@ impl WGPU {
         paint_api: CrossProcessPaintApi,
         webrender_external_image_id_manager: WebRenderExternalImageIdManager,
         wgpu_image_map: WebGpuExternalImageMap,
+        config: WebGpuThreadConfig,
     ) -> Self {
-        let backend_pref = pref!(dom_webgpu_wgpu_backend);
+        let backend_pref = config.wgpu_backend;
         let backends = if backend_pref.is_empty() {
             wgt::Backends::PRIMARY
         } else {

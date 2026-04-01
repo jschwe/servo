@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "components/media/examples",
+    "components/webgpu/loader",
+    "components/webgpu/plugin",
     "components/xpath",
     "ports/servoshell",
     "tests/unit/*",
@@ -291,6 +293,7 @@ timers = { package = "servo-timers", version = "0.1.0", path = "components/timer
 webdriver_server = { package = "servo-webdriver-server", version = "0.1.0", path = "components/webdriver_server" }
 webgl = { package = "servo-webgl", version = "0.1.0", path = "components/webgl", default-features = false }
 webgpu = { package = "servo-webgpu", version = "0.1.0", path = "components/webgpu" }
+webgpu_loader = { package = "servo-webgpu-loader", version = "0.1.0", path = "components/webgpu/loader" }
 webgpu_traits = { package = "servo-webgpu-traits", version = "0.1.0", path = "components/shared/webgpu" }
 webxr = { package = "servo-webxr", version = "0.1.0", path = "components/webxr" }
 webxr-api = { package = "servo-webxr-api", version = "0.1.0", path = "components/shared/webxr" }

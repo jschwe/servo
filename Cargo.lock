@@ -7500,7 +7500,6 @@ dependencies = [
  "servo-tracing",
  "servo-url",
  "servo-webgl",
- "servo-webgpu",
  "servo-webxr",
  "servo-webxr-api",
  "stylo",
@@ -7711,7 +7710,7 @@ dependencies = [
  "servo-storage-traits",
  "servo-tracing",
  "servo-url",
- "servo-webgpu",
+ "servo-webgpu-loader",
  "servo-webgpu-traits",
  "servo-webxr-api",
  "stylo",
@@ -8474,7 +8473,7 @@ dependencies = [
  "servo-timers",
  "servo-tracing",
  "servo-webgl",
- "servo-webgpu",
+ "servo-webgpu-loader",
  "servo-webxr",
  "servo-webxr-api",
  "smallvec",
@@ -8924,6 +8923,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "servo-webgpu-loader"
+version = "0.1.0"
+dependencies = [
+ "euclid",
+ "libloading 0.8.9",
+ "log",
+ "servo-config",
+ "servo-paint-api",
+ "servo-webgpu-traits",
+]
+
+[[package]]
+name = "servo-webgpu-plugin"
+version = "0.1.0"
+dependencies = [
+ "servo-paint-api",
+ "servo-webgpu",
+ "servo-webgpu-traits",
+]
+
+[[package]]
 name = "servo-webgpu-traits"
 version = "0.1.0"
 dependencies = [
@@ -8932,6 +8952,7 @@ dependencies = [
  "serde",
  "servo-base",
  "servo-malloc-size-of",
+ "servo-paint-api",
  "servo-pixels",
  "webrender_api",
  "wgpu-core",

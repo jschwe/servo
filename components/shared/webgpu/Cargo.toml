@@ -17,6 +17,7 @@ path = "lib.rs"
 arrayvec = { workspace = true }
 malloc_size_of = { workspace = true }
 malloc_size_of_derive = { workspace = true }
+paint_api = { workspace = true }
 pixels = { workspace = true }
 serde = { workspace = true }
 servo-base = { workspace = true }

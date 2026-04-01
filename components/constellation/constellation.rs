@@ -174,8 +174,6 @@ use storage_traits::indexeddb::{IndexedDBThreadMsg, SyncOperation};
 use storage_traits::webstorage_thread::{WebStorageThreadMsg, WebStorageType};
 use style::global_style_data::StyleThreadPool;
 #[cfg(feature = "webgpu")]
-use webgpu::canvas_context::WebGpuExternalImageMap;
-#[cfg(feature = "webgpu")]
 use webgpu_traits::{WebGPU, WebGPURequest};
 
 use super::embedder::ConstellationToEmbedderMsg;
@@ -237,9 +235,6 @@ struct MessagePortInfo {
 struct WebRenderWGPU {
     /// List of Webrender external images
     webrender_external_image_id_manager: WebRenderExternalImageIdManager,
-
-    /// WebGPU data that supplied to Webrender for rendering
-    wgpu_image_map: WebGpuExternalImageMap,
 }
 
 /// A browsing context group.
@@ -573,9 +568,6 @@ pub struct InitialConstellationState {
     /// The XR device registry
     pub webxr_registry: Option<webxr_api::Registry>,
 
-    #[cfg(feature = "webgpu")]
-    pub wgpu_image_map: WebGpuExternalImageMap,
-
     /// A list of URLs that can access privileged internal APIs.
     pub privileged_urls: Vec<ServoUrl>,
 
@@ -664,7 +656,6 @@ where
                 #[cfg(feature = "webgpu")]
                 let webrender_wgpu = WebRenderWGPU {
                     webrender_external_image_id_manager: state.webrender_external_image_id_manager,
-                    wgpu_image_map: state.wgpu_image_map,
                 };
 
                 let broken_image_icon_data = resources::read_bytes(Resource::BrokenImageIcon);
@@ -2121,7 +2112,7 @@ where
         browsing_context_id: BrowsingContextId,
         request: ScriptToConstellationMessage,
     ) {
-        use webgpu::start_webgpu_thread;
+        use webgpu_loader::start_webgpu_thread;
 
         let browsing_context_group_id = match self.browsing_contexts.get(&browsing_context_id) {
             Some(bc) => &bc.bc_group_id,
@@ -2147,7 +2138,6 @@ where
                 self.webrender_wgpu
                     .webrender_external_image_id_manager
                     .clone(),
-                self.webrender_wgpu.wgpu_image_map.clone(),
             )
             .map(|webgpu| {
                 let msg = ScriptThreadMessage::SetWebGPUPort(webgpu.1);

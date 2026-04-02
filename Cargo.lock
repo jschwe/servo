@@ -3856,7 +3856,7 @@ dependencies = [
 
 [[package]]
 name = "hyper_serde"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "cookie 0.18.1",
  "headers 0.4.1",

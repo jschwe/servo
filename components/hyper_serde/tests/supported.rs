@@ -14,7 +14,7 @@ use http::header::HeaderMap;
 use hyper::{Method, StatusCode, Uri};
 use mime::Mime;
 use serde::{Deserialize, Serialize};
-use servo_hyper_serde::{De, Ser, Serde};
+use hyper_serde::{De, Ser, Serde};
 
 fn is_supported<T>()
 where

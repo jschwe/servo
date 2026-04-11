@@ -8,7 +8,7 @@ FROM ghcr.io/astral-sh/uv:latest AS uv
 
 FROM ubuntu:24.04 AS base
 
-RUN echo "this should fail!" && exit 1
+RUN echo "We fixed it!"
 
 # Install apt dependencies.
 COPY python/servo/platform/linux_packages /tmp/linux_packages

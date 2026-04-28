@@ -11,7 +11,7 @@ use crate::dom::bindings::codegen::Bindings::CryptoKeyBinding::{KeyType, KeyUsag
 use crate::dom::bindings::codegen::Bindings::SubtleCryptoBinding::KeyFormat;
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::root::DomRoot;
-use crate::dom::cryptokey::{CryptoKey, Handle};
+use crate::dom::cryptokey::{CryptoKey, Handle, SensitiveBytes};
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::subtlecrypto::{
     CryptoAlgorithm, KeyAlgorithmAndDerivatives, NormalizedAlgorithm, SubtleHkdfParams,
@@ -128,7 +128,7 @@ pub(crate) fn import_key(
             extractable,
             KeyAlgorithmAndDerivatives::KeyAlgorithm(algorithm),
             usages,
-            Handle::HkdfSecret(key_data.to_vec()),
+            Handle::HkdfSecret(SensitiveBytes::new(key_data.to_vec())),
         );
 
         // Step 2.8. Return key.

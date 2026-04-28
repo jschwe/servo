@@ -9,6 +9,7 @@ use dom_struct::dom_struct;
 use js::jsapi::{Heap, JSObject, Value};
 use malloc_size_of::MallocSizeOf;
 use script_bindings::conversions::SafeToJSValConvertible;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::dom::bindings::cell::DomRefCell;
 use crate::dom::bindings::codegen::Bindings::CryptoKeyBinding::{
@@ -25,6 +26,9 @@ pub(crate) enum CryptoKeyOrCryptoKeyPair {
     CryptoKeyPair(CryptoKeyPair),
 }
 
+/// A type alias for sensitive data that should be zeroized when dropped.
+pub(crate) type SensitiveBytes = Zeroizing<Vec<u8>>;
+
 /// The underlying cryptographic data this key represents
 pub(crate) enum Handle {
     RsaPrivateKey(rsa::RsaPrivateKey),
@@ -35,16 +39,16 @@ pub(crate) enum Handle {
     P256PublicKey(p256::PublicKey),
     P384PublicKey(p384::PublicKey),
     P521PublicKey(p521::PublicKey),
-    Ed25519PrivateKey(Vec<u8>),
+    Ed25519PrivateKey(SensitiveBytes),
     Ed25519PublicKey(Vec<u8>),
     X25519PrivateKey(x25519_dalek::StaticSecret),
     X25519PublicKey(x25519_dalek::PublicKey),
     Aes128Key(aes::cipher::crypto_common::Key<aes::Aes128>),
     Aes192Key(aes::cipher::crypto_common::Key<aes::Aes192>),
     Aes256Key(aes::cipher::crypto_common::Key<aes::Aes256>),
-    HkdfSecret(Vec<u8>),
-    Pbkdf2(Vec<u8>),
-    Hmac(Vec<u8>),
+    HkdfSecret(SensitiveBytes),
+    Pbkdf2(SensitiveBytes),
+    Hmac(SensitiveBytes),
     MlKem512PrivateKey((ml_kem::B32, ml_kem::B32)),
     MlKem768PrivateKey((ml_kem::B32, ml_kem::B32)),
     MlKem1024PrivateKey((ml_kem::B32, ml_kem::B32)),
@@ -60,7 +64,7 @@ pub(crate) enum Handle {
     MlDsa65PublicKey(Box<ml_dsa::EncodedVerifyingKey<ml_dsa::MlDsa65>>),
     MlDsa87PublicKey(Box<ml_dsa::EncodedVerifyingKey<ml_dsa::MlDsa87>>),
     ChaCha20Poly1305Key(chacha20poly1305::Key),
-    Argon2Password(Vec<u8>),
+    Argon2Password(SensitiveBytes),
 }
 
 /// <https://w3c.github.io/webcrypto/#cryptokey-interface>
@@ -226,11 +230,26 @@ impl CryptoKeyMethods<crate::DomTypeHolder> for CryptoKey {
 impl Handle {
     pub(crate) fn as_bytes(&self) -> &[u8] {
         match self {
-            Self::Pbkdf2(bytes) => bytes,
-            Self::Hmac(bytes) => bytes,
-            Self::Ed25519PrivateKey(bytes) => bytes,
-            Self::Ed25519PublicKey(bytes) => bytes,
+            Self::HkdfSecret(bytes) => bytes.as_slice(),
+            Self::Pbkdf2(bytes) => bytes.as_slice(),
+            Self::Hmac(bytes) => bytes.as_slice(),
+            Self::Ed25519PrivateKey(bytes) => bytes.as_slice(),
+            Self::Ed25519PublicKey(bytes) => bytes.as_slice(),
+            Self::Argon2Password(bytes) => bytes.as_slice(),
             _ => unreachable!(),
+        }
+    }
+}
+
+// Some of the key types don't call zeroize on drop, so we need to do it manually.
+impl Drop for Handle {
+    fn drop(&mut self) {
+        match self {
+            Self::Aes128Key(key) => key.zeroize(),
+            Self::Aes192Key(key) => key.zeroize(),
+            Self::Aes256Key(key) => key.zeroize(),
+            Self::ChaCha20Poly1305Key(key) => key.zeroize(),
+            _ => {},
         }
     }
 }

@@ -14,7 +14,7 @@ use crate::dom::bindings::codegen::Bindings::SubtleCryptoBinding::{JsonWebKey, K
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
-use crate::dom::cryptokey::{CryptoKey, Handle};
+use crate::dom::cryptokey::{CryptoKey, Handle, SensitiveBytes};
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::subtlecrypto::{
     CryptoAlgorithm, ExportedKey, JsonWebKeyExt, JwkStringField, KeyAlgorithmAndDerivatives,
@@ -88,17 +88,17 @@ pub(crate) fn generate_key(
     let handle =
         match normalized_algorithm.length {
             128 => {
-                let mut key_bytes = vec![0; 16];
+                let mut key_bytes = SensitiveBytes::new(vec![0; 16]);
                 OsRng.fill_bytes(&mut key_bytes);
                 Handle::Aes128Key(Key::<Aes128>::clone_from_slice(&key_bytes))
             },
             192 => {
-                let mut key_bytes = vec![0; 24];
+                let mut key_bytes = SensitiveBytes::new(vec![0; 24]);
                 OsRng.fill_bytes(&mut key_bytes);
                 Handle::Aes192Key(Key::<Aes192>::clone_from_slice(&key_bytes))
             },
             256 => {
-                let mut key_bytes = vec![0; 32];
+                let mut key_bytes = SensitiveBytes::new(vec![0; 32]);
                 OsRng.fill_bytes(&mut key_bytes);
                 Handle::Aes256Key(Key::<Aes256>::clone_from_slice(&key_bytes))
             },
@@ -213,7 +213,7 @@ pub(crate) fn import_key(
     }
 
     // Step 2.
-    let data;
+    let data: SensitiveBytes;
     match format {
         // If format is "raw": (Only applied to AES-CTR, AES-CBC, AES-GCM, AES-KW)
         KeyFormat::Raw
@@ -226,7 +226,7 @@ pub(crate) fn import_key(
             ) =>
         {
             // Step 2.1. Let data be keyData.
-            data = key_data.to_vec();
+            data = SensitiveBytes::new(key_data.to_vec());
 
             // Step 2.2. If the length in bits of data is not 128, 192 or 256 then throw a
             // DataError.
@@ -239,7 +239,7 @@ pub(crate) fn import_key(
         // If format is "raw-secret":
         KeyFormat::Raw_secret => {
             // Step 2.1. Let data be keyData.
-            data = key_data.to_vec();
+            data = SensitiveBytes::new(key_data.to_vec());
 
             // Step 2.2. If the length in bits of data is not 128, 192 or 256 then throw a
             // DataError.
@@ -268,7 +268,7 @@ pub(crate) fn import_key(
             // Step 2.3. If jwk does not meet the requirements of Section 6.4 of JSON Web
             // Algorithms [JWA], then throw a DataError.
             // Step 2.4. Let data be the byte sequence obtained by decoding the k field of jwk.
-            data = jwk.decode_required_string_field(JwkStringField::K)?;
+            data = SensitiveBytes::new(jwk.decode_required_string_field(JwkStringField::K)?);
 
             match aes_algorithm {
                 AesAlgorithm::AesCtr => {

@@ -15,7 +15,7 @@ use crate::dom::bindings::codegen::Bindings::SubtleCryptoBinding::{JsonWebKey, K
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
-use crate::dom::cryptokey::{CryptoKey, Handle};
+use crate::dom::cryptokey::{CryptoKey, Handle, SensitiveBytes};
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::subtlecrypto::{
     CryptoAlgorithm, ExportedKey, JsonWebKeyExt, JwkStringField, KeyAlgorithmAndDerivatives,
@@ -101,7 +101,7 @@ pub(crate) fn generate_key(
     }
 
     // Step 2. Generate an Ed25519 key pair, as defined in [RFC8032], section 5.1.5.
-    let mut seed = vec![0u8; ED25519_SEED_LENGTH];
+    let mut seed = SensitiveBytes::new(vec![0u8; ED25519_SEED_LENGTH]);
     if OsRng.try_fill_bytes(&mut seed).is_err() {
         return Err(Error::Operation(Some("Error getting random data".into())));
     }
@@ -266,9 +266,7 @@ pub(crate) fn import_key(
                     Error::Data(Some(
                         "Failed to serialize the seed of the private key".into(),
                     ))
-                })?
-                .as_ref()
-                .to_vec();
+                })?;
 
             // Step 2.10. Let algorithm be a new KeyAlgorithm.
             // Step 2.11. Set the name attribute of algorithm to "Ed25519".
@@ -369,7 +367,7 @@ pub(crate) fn import_key(
             if jwk.d.is_some() {
                 // Step 2.9.1. If jwk does not meet the requirements of the JWK private key format
                 // described in Section 2 of [RFC8037], then throw a DataError.
-                let d = jwk.decode_required_string_field(JwkStringField::D)?;
+                let d = SensitiveBytes::new(jwk.decode_required_string_field(JwkStringField::D)?);
                 let x = jwk.decode_required_string_field(JwkStringField::X)?;
                 let _ = Ed25519KeyPair::from_seed_and_public_key(&d, &x).map_err(|error| {
                     Error::Data(Some(format!(

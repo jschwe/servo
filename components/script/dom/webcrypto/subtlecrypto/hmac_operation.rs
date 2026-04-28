@@ -14,7 +14,7 @@ use crate::dom::bindings::codegen::Bindings::CryptoKeyBinding::{KeyType, KeyUsag
 use crate::dom::bindings::codegen::Bindings::SubtleCryptoBinding::{JsonWebKey, KeyFormat};
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::root::DomRoot;
-use crate::dom::cryptokey::{CryptoKey, Handle};
+use crate::dom::cryptokey::{CryptoKey, Handle, SensitiveBytes};
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::subtlecrypto::{
     CryptoAlgorithm, ExportedKey, JsonWebKeyExt, JwkStringField, KeyAlgorithmAndDerivatives,
@@ -127,7 +127,7 @@ pub(crate) fn generate_key(
 
     // Step 3. Generate a key of length length bits.
     // Step 4. If the key generation step fails, then throw an OperationError.
-    let mut key_data = vec![0; length as usize];
+    let mut key_data = SensitiveBytes::new(vec![0; length as usize]);
     if OsRng.try_fill_bytes(&mut key_data).is_err() {
         return Err(Error::JSFailed);
     }
@@ -195,12 +195,12 @@ pub(crate) fn import_key(
     let hash;
 
     // Step 4.
-    let data;
+    let data: SensitiveBytes;
     match format {
         // If format is "raw":
         KeyFormat::Raw | KeyFormat::Raw_secret => {
             // Step 4.1. Let data be keyData.
-            data = key_data.to_vec();
+            data = SensitiveBytes::new(key_data.to_vec());
 
             // Step 4.2. Set hash to equal the hash member of normalizedAlgorithm.
             hash = &normalized_algorithm.hash;
@@ -224,7 +224,7 @@ pub(crate) fn import_key(
             // NOTE: Done by Step 2.4 and 2.6.
 
             // Step 2.4. Let data be the byte sequence obtained by decoding the k field of jwk.
-            data = jwk.decode_required_string_field(JwkStringField::K)?;
+            data = SensitiveBytes::new(jwk.decode_required_string_field(JwkStringField::K)?);
 
             // Step 2.5. Set the hash to equal the hash member of normalizedAlgorithm.
             hash = &normalized_algorithm.hash;
@@ -352,7 +352,8 @@ pub(crate) fn import_key(
     // bits of data.
     // Step 9. Set the [[type]] internal slot of key to "secret".
     // Step 14. Set the [[algorithm]] internal slot of key to algorithm.
-    let truncated_data = data[..length as usize / 8].to_vec();
+    let mut truncated_data = data;
+    truncated_data.truncate(length as usize / 8);
     let key = CryptoKey::new(
         cx,
         global,

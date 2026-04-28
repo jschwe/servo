@@ -13,7 +13,7 @@ use crate::dom::bindings::codegen::Bindings::SubtleCryptoBinding::{JsonWebKey, K
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
-use crate::dom::cryptokey::{CryptoKey, Handle};
+use crate::dom::cryptokey::{CryptoKey, Handle, SensitiveBytes};
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::subtlecrypto::{
     CryptoAlgorithm, ExportedKey, JsonWebKeyExt, JwkStringField, KeyAlgorithmAndDerivatives,
@@ -223,12 +223,12 @@ pub(crate) fn import_key(
     }
 
     // Step 3.
-    let data;
+    let data: SensitiveBytes;
     match format {
         // If format is "raw-secret":
         KeyFormat::Raw_secret => {
             // Step 3.1. Let data be keyData.
-            data = key_data.to_vec();
+            data = SensitiveBytes::new(key_data.to_vec());
 
             // Step 3.2. If the length in bits of data is not 256 then throw a DataError.
             if data.len() != 32 {
@@ -256,7 +256,7 @@ pub(crate) fn import_key(
             // Step 3.3. If jwk does not meet the requirements of Section 6.4 of JSON Web
             // Algorithms [JWA], then throw a DataError.
             // Step 3.4. Let data be the byte sequence obtained by decoding the k field of jwk.
-            data = jwk.decode_required_string_field(JwkStringField::K)?;
+            data = SensitiveBytes::new(jwk.decode_required_string_field(JwkStringField::K)?);
 
             // Step 3.5. If the alg field of jwk is present, and is not "C20P", then throw a
             // DataError.
@@ -304,7 +304,7 @@ pub(crate) fn import_key(
     // Step 6. Let algorithm be a new KeyAlgorithm.
     // Step 7. Set the name attribute of algorithm to "ChaCha20-Poly1305".
     // Step 8. Set the [[algorithm]] internal slot of key to algorithm.
-    let handle = Handle::ChaCha20Poly1305Key(Key::from_exact_iter(data).ok_or(Error::Data(
+    let handle = Handle::ChaCha20Poly1305Key(Key::from_exact_iter(data.iter()).ok_or(Error::Data(
         Some("ChaCha20-Poly1305 fails to create key from data".to_string()),
     ))?);
     let algorithm = SubtleKeyAlgorithm {

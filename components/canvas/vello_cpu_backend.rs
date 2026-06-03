@@ -51,6 +51,12 @@ pub(crate) struct VelloCPUDrawTarget {
     pixmap: vello_cpu::Pixmap,
     clips: Vec<(Path, kurbo::Affine)>,
     state: State,
+    /// The last rendered pixmap's bytes, cached as `Arc<Vec<u8>>` so that
+    /// `image_descriptor_and_serializable_data` can hand a clone directly to WebRender
+    /// without copying. After a snapshot, `self.pixmap` is replaced with a fresh empty
+    /// pixmap; `ensure_drawing` consumes this buffer the next time it has to set the
+    /// canvas's existing content as paint background, preserving incremental drawing.
+    last_rendered_buffer: Option<Arc<Vec<u8>>>,
 }
 
 impl VelloCPUDrawTarget {
@@ -89,8 +95,21 @@ impl VelloCPUDrawTarget {
             State::Rendered => {
                 self.ignore_clips(|self_| {
                     self_.ctx.set_transform(kurbo::Affine::IDENTITY);
+                    // After a snapshot via `image_descriptor_and_serializable_data` the
+                    // pixmap is empty but the rendered bytes survive in
+                    // `last_rendered_buffer`. Reconstruct a Pixmap from those bytes so the
+                    // canvas's existing content remains the paint background. Fall back to
+                    // cloning `self.pixmap` when no snapshot has run since the last render.
+                    let paint_pixmap = match self_.last_rendered_buffer.take() {
+                        Some(buf) => vello_cpu::Pixmap::from_parts(
+                            bytemuck::cast_slice(buf.as_slice()).to_vec(),
+                            self_.pixmap.width(),
+                            self_.pixmap.height(),
+                        ),
+                        None => self_.pixmap.clone(),
+                    };
                     self_.ctx.set_paint(vello_cpu::Image {
-                        image: vello_cpu::ImageSource::Pixmap(Arc::new(self_.pixmap.clone())),
+                        image: vello_cpu::ImageSource::Pixmap(Arc::new(paint_pixmap)),
                         sampler: peniko::ImageSampler {
                             x_extend: peniko::Extend::Pad,
                             y_extend: peniko::Extend::Pad,
@@ -157,6 +176,7 @@ impl GenericDrawTarget for VelloCPUDrawTarget {
             pixmap: vello_cpu::Pixmap::new(size.width, size.height),
             clips: Vec::new(),
             state: State::Rendered,
+            last_rendered_buffer: None,
         }
     }
 
@@ -167,6 +187,9 @@ impl GenericDrawTarget for VelloCPUDrawTarget {
             self.ctx.reset();
             self.clips.clear(); // no clips are affecting rendering
             self.state = State::Drawing;
+            // A full-viewport clear means the previous frame is gone — drop any
+            // `last_rendered_buffer` so we don't replay stale content as paint background.
+            self.last_rendered_buffer = None;
             return;
         }
         self.ensure_drawing();
@@ -471,7 +494,23 @@ impl GenericDrawTarget for VelloCPUDrawTarget {
             offset: 0,
             flags: ImageDescriptorFlags::empty(),
         };
-        let data = SerializableImageData::Raw(GenericSharedMemory::from_bytes(self.pixmap()));
+        // Ensure any pending scene is flushed into `self.pixmap` (sets state = Rendered).
+        self.pixmap();
+        // Swap the freshly-rendered pixmap out for a fresh empty one, then take ownership
+        // of its `Vec<PremulRgba8>` without copying. `bytemuck::cast_vec` reinterprets it
+        // as `Vec<u8>` in place (same allocation, no memcpy), and
+        // `GenericSharedMemory::from_arc_vec` wraps the `Arc` directly in single-process
+        // mode — so the per-frame snapshot copy is eliminated.
+        let (width, height) = (self.pixmap.width(), self.pixmap.height());
+        let arc: Arc<Vec<u8>> = {
+            let old_pixmap =
+                std::mem::replace(&mut self.pixmap, vello_cpu::Pixmap::new(width, height));
+            Arc::new(bytemuck::cast_vec(old_pixmap.take()))
+        };
+        // Keep the rendered bytes so the next `ensure_drawing` can replay them as paint
+        // background instead of a blank pixmap.
+        self.last_rendered_buffer = Some(arc.clone());
+        let data = SerializableImageData::Raw(GenericSharedMemory::from_arc_vec(arc));
         (image_desc, data)
     }
 

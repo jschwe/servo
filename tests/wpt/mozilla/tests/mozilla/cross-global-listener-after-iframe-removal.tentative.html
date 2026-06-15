@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Listeners whose callback comes from a removed iframe's realm are skipped</title>
+<!--
+  Tentative: matches Gecko and Blink, which skip event listeners whose
+  callback function's realm has been torn down. WebKit still runs them, and
+  the HTML/WebIDL specifications currently only gate classic and module
+  script execution on fully active documents.
+-->
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+<iframe src="cross-global-listener-after-iframe-removal-child.html"></iframe>
+<script>
+  async_test((t) => {
+    window.firedCount = 0;
+    let sameRealmCount = 0;
+    document.addEventListener("cross-global-test", t.step_func(() => {
+      sameRealmCount++;
+    }));
+
+    const dispatch = () => document.dispatchEvent(new Event("cross-global-test"));
+
+    window.addEventListener("message", t.step_func((event) => {
+      if (event.data !== "listener-installed") {
+        return;
+      }
+      assert_true(dispatch(), "dispatch completes while the iframe is alive");
+      assert_equals(window.firedCount, 1,
+        "iframe-realm listener runs while the iframe is alive");
+      assert_equals(sameRealmCount, 1,
+        "same-realm listener runs while the iframe is alive");
+
+      document.querySelector("iframe").remove();
+      assert_true(dispatch(), "dispatch completes after the iframe is removed");
+      assert_equals(window.firedCount, 1,
+        "iframe-realm listener is skipped after the iframe is removed");
+      assert_equals(sameRealmCount, 2,
+        "same-realm listener still runs after the iframe is removed");
+
+      t.step_timeout(() => {
+        assert_true(dispatch(), "dispatch completes a task after the iframe is removed");
+        assert_equals(window.firedCount, 1,
+          "iframe-realm listener is still skipped a task after the iframe is removed");
+        assert_equals(sameRealmCount, 3,
+          "same-realm listener still runs a task after the iframe is removed");
+        t.done();
+      }, 0);
+    }));
+  }, "Listeners whose callback comes from a removed iframe's realm are skipped");
+</script>

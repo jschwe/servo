@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script>
+  // Register a listener on the parent document with a function from this
+  // realm, then tell the parent it can remove this iframe. The parent
+  // window reference is captured here because window.parent is null once
+  // this iframe's browsing context is discarded.
+  const parentWin = window.parent;
+  parentWin.document.addEventListener("cross-global-test", () => {
+    parentWin.firedCount++;
+  });
+  parentWin.postMessage("listener-installed", "*");
+</script>

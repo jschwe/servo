@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html class="test-wait">
+<meta charset="utf-8">
+<title>Dispatching an event to a listener whose callback comes from a removed iframe's realm must not crash</title>
+<!--
+  The child iframe registers an event listener on this document with a
+  function from the iframe's realm. After the iframe is removed, the
+  listener is still registered on this document, and dispatching the event
+  must not crash. The dispatch is repeated for a while because the iframe's
+  realm may be torn down asynchronously after removal.
+-->
+<iframe src="cross-global-listener-after-iframe-removal-child.html"></iframe>
+<script>
+  window.firedCount = 0;
+  window.addEventListener("message", (event) => {
+    if (event.data !== "listener-installed") {
+      return;
+    }
+    document.querySelector("iframe").remove();
+    document.dispatchEvent(new Event("cross-global-test"));
+    let remaining = 20;
+    const timer = setInterval(() => {
+      document.dispatchEvent(new Event("cross-global-test"));
+      if (--remaining === 0) {
+        clearInterval(timer);
+        document.documentElement.classList.remove("test-wait");
+      }
+    }, 100);
+  });
+</script>
+</html>

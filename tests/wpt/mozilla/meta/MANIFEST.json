@@ -69,6 +69,13 @@
       ]
      ]
     },
+    "cross-global-listener-after-iframe-removal-crash.html": [
+     "720cdcf843316f99524627e2f727c722e60f9ed3",
+     [
+      null,
+      {}
+     ]
+    ],
     "datatransferitem-crash.html": [
      "d11355ab38c1e99e0ba3e10d7dfed18bf26af60b",
      [
@@ -10899,6 +10906,10 @@
      "c330e7339e478690b7694d70f3b05c6b3808a8d2",
      []
     ],
+    "cross-global-listener-after-iframe-removal-child.html": [
+     "c59cdac9f11fada2b1f2844b5026c03077117965",
+     []
+    ],
     "cross-origin-objects": {
      "cross-origin-postMessage-child1.html": [
       "6097799bb60aa0f0a9ee0920df3b92c0b4d7ed6b",
@@ -13722,6 +13733,13 @@
     ],
     "createEvent-storageevent.html": [
      "f5deb0173b1459a655ecd62d1c1fd1b45c42c35b",
+     [
+      null,
+      {}
+     ]
+    ],
+    "cross-global-listener-after-iframe-removal.tentative.html": [
+     "cb71a086d7d5ecc6f4e021c56cce0c96151b965e",
      [
       null,
       {}

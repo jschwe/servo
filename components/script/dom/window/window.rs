@@ -86,8 +86,9 @@ use servo_url::{ImmutableOrigin, MutableOrigin, ServoUrl};
 use storage_traits::StorageThreads;
 use storage_traits::webstorage_thread::WebStorageType;
 use style::error_reporting::{ContextualParseError, ParseErrorReporter};
-use style::properties::PropertyId;
+use style::logical_geometry::WritingMode;
 use style::properties::style_structs::Font;
+use style::properties::{LonghandId, PropertyId};
 use style::selector_parser::PseudoElement;
 use style::str::HTML_SPACE_CHARACTERS;
 use style::stylesheets::UrlExtraData;
@@ -2973,7 +2974,21 @@ impl Window {
         pseudo: Option<PseudoElement>,
         property: PropertyId,
     ) -> DOMString {
-        self.layout_reflow(QueryMsg::ResolvedStyleQuery);
+        // `getComputedStyle()` resolves most properties to their *computed* value, which can be
+        // read from style alone. Only a bounded set of properties resolve to a *used* value that
+        // must be read from the fragment tree (sizes, margins, paddings, positioned insets,
+        // transform, grid templates — see `process_resolved_style_request` in
+        // `components/layout/query.rs`, which this set must be kept in sync with). The latter need
+        // the full layout reflow; the former take the lighter `ResolvedStyleQueryStyleOnly` path,
+        // which skips stacking-context-tree construction (and can be skipped entirely when only the
+        // stacking context tree, not style, is dirty). This avoids forcing a full stacking-context
+        // rebuild for cheap, frequent reads like `getComputedStyle(el).overflow`.
+        let query = if resolved_style_is_used_value(&property) {
+            QueryMsg::ResolvedStyleQuery
+        } else {
+            QueryMsg::ResolvedStyleQueryStyleOnly
+        };
+        self.layout_reflow(query);
 
         let document = self.Document();
         let animations = document.animations().sets.clone();
@@ -3946,6 +3961,47 @@ fn is_named_element_with_name_attribute(elem: &Element) -> bool {
 
 fn is_named_element_with_id_attribute(elem: &Element) -> bool {
     elem.is_html_element()
+}
+
+/// Whether the resolved value of `property` (for `getComputedStyle()`) is a *used* value that
+/// must be read from the laid-out fragment tree, rather than a *computed* value readable from
+/// style alone.
+///
+/// This mirrors the set of longhands that `process_resolved_style_request`
+/// (`components/layout/query.rs`) reads from the fragment; the two must be kept in sync.
+fn resolved_style_is_used_value(property: &PropertyId) -> bool {
+    fn longhand_is_used_value(id: LonghandId) -> bool {
+        // Physicalize so logical aliases (e.g. `inset-inline-start`, `margin-block-end`,
+        // `inline-size`) are classified the same as their physical counterparts below.
+        // For the purpose of this evaluation, the writing mode is arbitrary.
+        matches!(
+            id.to_physical(WritingMode::horizontal_tb()),
+            LonghandId::Width |
+                LonghandId::Height |
+                LonghandId::MinWidth |
+                LonghandId::MinHeight |
+                LonghandId::MarginTop |
+                LonghandId::MarginBottom |
+                LonghandId::MarginLeft |
+                LonghandId::MarginRight |
+                LonghandId::PaddingTop |
+                LonghandId::PaddingBottom |
+                LonghandId::PaddingLeft |
+                LonghandId::PaddingRight |
+                LonghandId::Top |
+                LonghandId::Right |
+                LonghandId::Bottom |
+                LonghandId::Left |
+                LonghandId::Transform |
+                LonghandId::GridTemplateRows |
+                LonghandId::GridTemplateColumns
+        )
+    }
+
+    match property.as_shorthand() {
+        Ok(shorthand) => shorthand.longhands().any(longhand_is_used_value),
+        Err(_) => property.longhand_id().is_some_and(longhand_is_used_value),
+    }
 }
 
 #[expect(unsafe_code)]

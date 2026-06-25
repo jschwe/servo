@@ -551,6 +551,11 @@ pub enum QueryMsg {
     ScrollParentQuery,
     ResolvedFontStyleQuery,
     ResolvedStyleQuery,
+    /// A `getComputedStyle()` query for a property whose resolved value is its *computed*
+    /// value (e.g. `overflow`), not a *used* value read from the fragment tree. Unlike
+    /// [`QueryMsg::ResolvedStyleQuery`] it does not need stacking-context-tree construction,
+    /// so it takes a lighter reflow path. See `Window::resolved_style_query`.
+    ResolvedStyleQueryStyleOnly,
     ScrollingAreaOrOffsetQuery,
     StyleQuery,
     TextIndexQuery,

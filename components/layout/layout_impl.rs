@@ -1875,6 +1875,7 @@ impl ReflowPhases {
                 QueryMsg::InnerWindowDimensionsQuery |
                 QueryMsg::PaddingQuery |
                 QueryMsg::ResolvedFontStyleQuery |
+                QueryMsg::ResolvedStyleQueryStyleOnly |
                 QueryMsg::ScrollParentQuery |
                 QueryMsg::StyleQuery => Self::empty(),
             },

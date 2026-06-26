@@ -13061,6 +13061,13 @@
       {}
      ]
     ],
+    "getComputedStyle-logical-insets-sticky.html": [
+     "89fbaf1e0e71e25b63130bb7af820cd50c87a851",
+     [
+      null,
+      {}
+     ]
+    ],
     "import-serialization.html": [
      "44c828db3cb289d6a05d4928189b36e24a604f0b",
      [

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>CSSOM: resolved values of logical inset properties for sticky positioning</title>
+<link rel="help" href="https://drafts.csswg.org/cssom/#resolved-value">
+<link rel="help" href="https://drafts.csswg.org/css-logical/#inset-properties">
+<link rel="help" href="https://drafts.csswg.org/css-position/#sticky-pos">
+<!--
+  Regression test: the resolved value of a *logical* inset property
+  (`inset-inline-start` etc.) on a `position: sticky` box is read as a used
+  value, just like its physical counterpart. The used insets of a sticky box
+  are only computed during stacking-context-tree construction, so the layout
+  query for these properties must request the full reflow. Querying a logical
+  inset previously took a style-only reflow path that skipped that phase: when
+  the fragment tree was rebuilt by that reflow, the sticky box's resolved insets
+  were never computed, yielding a wrong value (and tripping a debug assertion in
+  `calculate_resolved_insets_if_positioned`).
+
+  The bug only surfaces when the fragment tree is actually rebuilt by the query
+  itself, so each subtest dirties layout (via an element *after* the sticky box,
+  which cannot change the sticky box's own offset) right before reading.
+-->
+<style>
+  #scroller {
+    overflow: scroll;
+    width: 200px;
+    height: 200px;
+  }
+  #sticky {
+    position: sticky;
+    top: 30px;
+    left: 40px;
+    width: 50px;
+    height: 50px;
+    /* horizontal-tb + ltr so inline-start maps to `left`, block-start to `top`. */
+    writing-mode: horizontal-tb;
+    direction: ltr;
+  }
+  /* Provides scroll range in both axes so the sticky box actually sticks. */
+  #trailing { width: 1000px; height: 1000px; }
+</style>
+<div id="scroller">
+  <div id="sticky"></div>
+  <div id="trailing"></div>
+</div>
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+<script>
+const scroller = document.getElementById("scroller");
+const sticky = document.getElementById("sticky");
+const trailing = document.getElementById("trailing");
+
+// Scroll so the sticky box is stuck and its used insets differ from the
+// computed ones.
+scroller.scrollTop = 100;
+scroller.scrollLeft = 60;
+
+let dirtyCounter = 0;
+function forceFragmentTreeRebuild() {
+  sticky.style.width = (50 + (dirtyCounter++ % 2)) + "px";
+}
+
+const logicalToPhysical = {
+  "inset-block-start": "top",
+  "inset-block-end": "bottom",
+  "inset-inline-start": "left",
+  "inset-inline-end": "right",
+};
+
+for (const [logical, physical] of Object.entries(logicalToPhysical)) {
+  test(() => {
+    // Read the logical inset with layout freshly dirtied
+    forceFragmentTreeRebuild();
+    const logicalValue = getComputedStyle(sticky).getPropertyValue(logical);
+    // Read the physical counterpart, also with layout freshly dirtied
+    forceFragmentTreeRebuild();
+    const physicalValue = getComputedStyle(sticky).getPropertyValue(physical);
+
+    assert_not_equals(logicalValue, "", `${logical} should produce a resolved value`);
+    // In horizontal-tb / ltr the logical inset maps directly onto the physical
+    // one, so the resolved (used) values must be identical.
+    assert_equals(logicalValue, physicalValue,
+      `${logical} should resolve to the same used value as ${physical}`);
+  }, `Resolved value of ${logical} on a sticky box matches ${physical}`);
+}
+
+// The start insets are set to explicit lengths and the box is stuck, so they
+// must resolve to a used px length (proving the fragment tree, not just style,
+// was consulted).
+test(() => {
+  forceFragmentTreeRebuild();
+  assert_regexp_match(getComputedStyle(sticky).getPropertyValue("inset-inline-start"),
+    /^-?\d+(\.\d+)?px$/, "inset-inline-start should be a used px length");
+  forceFragmentTreeRebuild();
+  assert_regexp_match(getComputedStyle(sticky).getPropertyValue("inset-block-start"),
+    /^-?\d+(\.\d+)?px$/, "inset-block-start should be a used px length");
+}, "Logical start insets on a sticky box resolve to used px lengths");
+</script>

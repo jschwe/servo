@@ -11,7 +11,7 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 pub use embedder_traits::*;
 use env_logger::Builder as EnvLoggerBuilder;
-use fonts::SystemFontService;
+use fonts::{SvgFontProviderImpl, SystemFontService};
 #[cfg(all(
     not(target_os = "windows"),
     not(target_os = "ios"),
@@ -1333,11 +1333,18 @@ pub fn run_content_process(token: String) {
                 );
 
             let layout_factory = Arc::new(LayoutFactoryImpl());
+            let system_font_service_proxy = Arc::new(
+                new_event_loop_info
+                    .initial_script_state
+                    .system_font_service
+                    .to_proxy(),
+            );
             let script_join_handle = script::ScriptThread::create(
                 new_event_loop_info.initial_script_state,
                 layout_factory,
                 Arc::new(ImageCacheFactoryImpl::new(
                     new_event_loop_info.broken_image_icon_data,
+                    Arc::new(SvgFontProviderImpl::new(system_font_service_proxy)),
                 )),
                 background_hang_monitor_register,
             );

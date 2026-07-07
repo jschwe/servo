@@ -116,7 +116,7 @@ use embedder_traits::{
 };
 use euclid::Size2D;
 use euclid::default::Size2D as UntypedSize2D;
-use fonts::SystemFontServiceProxy;
+use fonts::{SvgFontProviderImpl, SystemFontServiceProxy};
 use ipc_channel::IpcError;
 use ipc_channel::router::ROUTER;
 use keyboard_types::{Key, KeyState, Modifiers, NamedKey};
@@ -692,7 +692,7 @@ where
                     private_resource_threads: state.private_resource_threads,
                     public_storage_threads: state.public_storage_threads,
                     private_storage_threads: state.private_storage_threads,
-                    system_font_service: state.system_font_service,
+                    system_font_service: state.system_font_service.clone(),
                     sw_managers: Default::default(),
                     browsing_context_group_set: Default::default(),
                     browsing_context_group_next_id: Default::default(),
@@ -737,6 +737,7 @@ where
                     privileged_urls: state.privileged_urls,
                     image_cache_factory: Arc::new(ImageCacheFactoryImpl::new(
                         broken_image_icon_data,
+                        Arc::new(SvgFontProviderImpl::new(state.system_font_service)),
                     )),
                     pending_viewport_changes: Default::default(),
                     screenshot_readiness_requests: Vec::new(),

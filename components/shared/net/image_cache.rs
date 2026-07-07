@@ -157,6 +157,55 @@ pub enum ImageCacheResult {
     ReadyForRequest(PendingImageId),
 }
 
+#[derive(Clone, Debug)]
+pub enum SvgFontFamily {
+    Named(String),
+    Serif,
+    SansSerif,
+    Cursive,
+    Fantasy,
+    Monospace,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum SvgFontStyle {
+    Normal,
+    Italic,
+    Oblique,
+}
+
+#[derive(Clone, Debug)]
+pub struct SvgFontQuery {
+    pub families: Vec<SvgFontFamily>,
+    pub weight: u16,
+    pub style: SvgFontStyle,
+    pub stretch_percentage: f32,
+}
+
+/// The raw data of a font face selected by a [`SvgFontProvider`].
+#[derive(Clone)]
+pub struct SvgFontData {
+    /// An opaque process-local identifier of the underlying font face, used to
+    /// deduplicate faces and to exclude already tried faces during fallback.
+    pub key: String,
+    pub data: Arc<dyn AsRef<[u8]> + Send + Sync>,
+    /// The index of the face within the font data, in case of a collection.
+    pub index: u32,
+}
+
+/// A source of system font data used when rasterizing text in vector images,
+/// allowing the image cache to reuse the font enumeration of the embedding
+/// process instead of scanning system fonts itself.
+pub trait SvgFontProvider: Send + Sync {
+    fn select_font(&self, query: &SvgFontQuery) -> Option<SvgFontData>;
+    fn select_fallback(
+        &self,
+        character: char,
+        exclude_keys: &[String],
+        query: &SvgFontQuery,
+    ) -> Option<SvgFontData>;
+}
+
 /// A shared [`ImageCacheFactory`] is a per-process data structure used to create an [`ImageCache`]
 /// inside that process in any `ScriptThread`. This allows sharing the same font database (for
 /// SVGs) and also decoding thread pool among all [`ImageCache`]s in the same process.

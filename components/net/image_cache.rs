@@ -18,7 +18,8 @@ use mime::Mime;
 use net_traits::image_cache::{
     Image, ImageCache, ImageCacheFactory, ImageCacheResponseCallback, ImageCacheResponseMessage,
     ImageCacheResult, ImageLoadListener, ImageOrMetadataAvailable, ImageResponse, PendingImageId,
-    RasterizationCompleteResponse, VectorImage,
+    RasterizationCompleteResponse, SvgFontData, SvgFontFamily, SvgFontProvider, SvgFontQuery,
+    SvgFontStyle, VectorImage,
 };
 use net_traits::request::CorsSettings;
 use net_traits::{FetchMetadata, FetchResponseMsg, FilteredMetadata, NetworkError};
@@ -80,7 +81,7 @@ const MAX_SVG_PIXMAP_DIMENSION: u32 = 5000;
 
 fn parse_svg_document_in_memory(
     bytes: &[u8],
-    fontdb: Arc<fontdb::Database>,
+    svg_fonts: &Arc<SvgFontDatabase>,
 ) -> Result<usvg::Tree, &'static str> {
     let image_string_href_resolver = Box::new(move |_: &str, _: &usvg::Options| {
         // Do not try to load `href` in <image> as local file path.
@@ -92,15 +93,200 @@ fn parse_svg_document_in_memory(
             resolve_data: usvg::ImageHrefResolver::default_data_resolver(),
             resolve_string: image_string_href_resolver,
         },
-        fontdb,
+        fontdb: svg_fonts.snapshot(),
+        font_resolver: svg_fonts.font_resolver(),
         ..usvg::Options::default()
     };
 
-    usvg::Tree::from_data(bytes, &opt)
+    let tree = usvg::Tree::from_data(bytes, &opt)
         .inspect_err(|error| {
             warn!("Error when parsing SVG data: {error}");
         })
-        .map_err(|_| "Not a valid SVG document")
+        .map_err(|_| "Not a valid SVG document")?;
+    svg_fonts.absorb(tree.fontdb());
+    Ok(tree)
+}
+
+fn svg_font_query(font: &usvg::Font) -> SvgFontQuery {
+    let families = font
+        .families()
+        .iter()
+        .map(|family| match family {
+            usvg::FontFamily::Named(name) => SvgFontFamily::Named(name.clone()),
+            usvg::FontFamily::Serif => SvgFontFamily::Serif,
+            usvg::FontFamily::SansSerif => SvgFontFamily::SansSerif,
+            usvg::FontFamily::Cursive => SvgFontFamily::Cursive,
+            usvg::FontFamily::Fantasy => SvgFontFamily::Fantasy,
+            usvg::FontFamily::Monospace => SvgFontFamily::Monospace,
+        })
+        .collect();
+    SvgFontQuery {
+        families,
+        weight: font.weight(),
+        style: match font.style() {
+            usvg::FontStyle::Normal => SvgFontStyle::Normal,
+            usvg::FontStyle::Italic => SvgFontStyle::Italic,
+            usvg::FontStyle::Oblique => SvgFontStyle::Oblique,
+        },
+        stretch_percentage: match font.stretch() {
+            usvg::FontStretch::UltraCondensed => 50.,
+            usvg::FontStretch::ExtraCondensed => 62.5,
+            usvg::FontStretch::Condensed => 75.,
+            usvg::FontStretch::SemiCondensed => 87.5,
+            usvg::FontStretch::Normal => 100.,
+            usvg::FontStretch::SemiExpanded => 112.5,
+            usvg::FontStretch::Expanded => 125.,
+            usvg::FontStretch::ExtraExpanded => 150.,
+            usvg::FontStretch::UltraExpanded => 200.,
+        },
+    }
+}
+
+/// The query to use when searching for a fallback font, based on the properties of the
+/// font that was originally selected for the text needing fallback.
+fn svg_fallback_query(exclude: &[fontdb::ID], database: &fontdb::Database) -> SvgFontQuery {
+    let base_face = exclude.first().and_then(|id| database.face(*id));
+    SvgFontQuery {
+        families: Vec::new(),
+        weight: base_face.map_or(400, |face| face.weight.0),
+        style: base_face.map_or(SvgFontStyle::Normal, |face| match face.style {
+            fontdb::Style::Normal => SvgFontStyle::Normal,
+            fontdb::Style::Italic => SvgFontStyle::Italic,
+            fontdb::Style::Oblique => SvgFontStyle::Oblique,
+        }),
+        stretch_percentage: base_face.map_or(100., |face| match face.stretch {
+            fontdb::Stretch::UltraCondensed => 50.,
+            fontdb::Stretch::ExtraCondensed => 62.5,
+            fontdb::Stretch::Condensed => 75.,
+            fontdb::Stretch::SemiCondensed => 87.5,
+            fontdb::Stretch::Normal => 100.,
+            fontdb::Stretch::SemiExpanded => 112.5,
+            fontdb::Stretch::Expanded => 125.,
+            fontdb::Stretch::ExtraExpanded => 150.,
+            fontdb::Stretch::UltraExpanded => 200.,
+        }),
+    }
+}
+
+/// A mapping between the faces added to a font database during a single SVG parse and
+/// the [`SvgFontProvider`] keys they were loaded from.
+#[derive(Default)]
+struct ResolvedSvgFaces {
+    id_by_key: FxHashMap<String, fontdb::ID>,
+    key_by_id: FxHashMap<fontdb::ID, String>,
+}
+
+impl ResolvedSvgFaces {
+    fn add_to_database(
+        &mut self,
+        font_data: SvgFontData,
+        database: &mut Arc<fontdb::Database>,
+    ) -> Option<fontdb::ID> {
+        if let Some(&id) = self.id_by_key.get(&font_data.key) &&
+            database.face(id).is_some()
+        {
+            return Some(id);
+        }
+
+        // A face loaded during an earlier parse can be reused if this snapshot of the
+        // shared database already contains its data.
+        let existing = database
+            .faces()
+            .find(|face| {
+                face.index == font_data.index &&
+                    matches!(&face.source, fontdb::Source::Binary(data)
+                        if std::ptr::addr_eq(Arc::as_ptr(data), Arc::as_ptr(&font_data.data)))
+            })
+            .map(|face| face.id);
+
+        let id = existing.or_else(|| {
+            let ids = Arc::make_mut(database)
+                .load_font_source(fontdb::Source::Binary(font_data.data.clone()));
+            ids.iter()
+                .copied()
+                .find(|id| {
+                    database
+                        .face(*id)
+                        .is_some_and(|face| face.index == font_data.index)
+                })
+                .or_else(|| ids.first().copied())
+        })?;
+
+        self.id_by_key.insert(font_data.key.clone(), id);
+        self.key_by_id.insert(id, font_data.key);
+        Some(id)
+    }
+}
+
+/// A font database for rasterizing text in vector images, shared by all [`ImageCache`]s
+/// in a process. It starts out empty and is populated on demand from a
+/// [`SvgFontProvider`], avoiding a scan of all system fonts.
+struct SvgFontDatabase {
+    provider: Arc<dyn SvgFontProvider>,
+    database: Mutex<Arc<fontdb::Database>>,
+}
+
+impl SvgFontDatabase {
+    fn new(provider: Arc<dyn SvgFontProvider>) -> Self {
+        Self {
+            provider,
+            database: Mutex::new(Arc::new(fontdb::Database::new())),
+        }
+    }
+
+    fn snapshot(&self) -> Arc<fontdb::Database> {
+        self.database.lock().clone()
+    }
+
+    /// Store the database of a finished parse, so that fonts loaded for it are
+    /// available to future parses.
+    fn absorb(&self, database: &Arc<fontdb::Database>) {
+        let mut current = self.database.lock();
+        if database.len() > current.len() {
+            *current = database.clone();
+        }
+    }
+
+    fn font_resolver(&self) -> usvg::FontResolver<'static> {
+        let resolved = Arc::new(Mutex::new(ResolvedSvgFaces::default()));
+
+        let select_font = {
+            let provider = self.provider.clone();
+            let resolved = resolved.clone();
+            Box::new(
+                move |font: &usvg::Font, database: &mut Arc<fontdb::Database>| {
+                    let font_data = provider.select_font(&svg_font_query(font))?;
+                    resolved.lock().add_to_database(font_data, database)
+                },
+            )
+        };
+
+        let select_fallback = {
+            let provider = self.provider.clone();
+            Box::new(
+                move |character: char,
+                      exclude: &[fontdb::ID],
+                      database: &mut Arc<fontdb::Database>| {
+                    let query = svg_fallback_query(exclude, database);
+                    let exclude_keys: Vec<String> = {
+                        let resolved = resolved.lock();
+                        exclude
+                            .iter()
+                            .filter_map(|id| resolved.key_by_id.get(id).cloned())
+                            .collect()
+                    };
+                    let font_data = provider.select_fallback(character, &exclude_keys, &query)?;
+                    let id = resolved.lock().add_to_database(font_data, database)?;
+                    (!exclude.contains(&id)).then_some(id)
+                },
+            )
+        };
+
+        usvg::FontResolver {
+            select_font,
+            select_fallback,
+        }
+    }
 }
 
 fn decode_bytes_sync(
@@ -108,7 +294,7 @@ fn decode_bytes_sync(
     bytes: &[u8],
     cors: CorsStatus,
     content_type: Option<Mime>,
-    fontdb: Arc<fontdb::Database>,
+    svg_fonts: &Arc<SvgFontDatabase>,
 ) -> DecoderMsg {
     let is_svg_document = content_type.is_some_and(|content_type| {
         (
@@ -119,7 +305,7 @@ fn decode_bytes_sync(
     });
 
     let image = if is_svg_document {
-        parse_svg_document_in_memory(bytes, fontdb)
+        parse_svg_document_in_memory(bytes, svg_fonts)
             .ok()
             .map(|svg_tree| {
                 DecodedImage::Vector(VectorImageData {
@@ -797,19 +983,19 @@ pub struct ImageCacheFactoryImpl {
     thread_pool: Arc<ThreadPool>,
     /// A shared font database to be used by system fonts accessed when rasterizing vector
     /// images.
-    fontdb: Arc<fontdb::Database>,
+    svg_fonts: Arc<SvgFontDatabase>,
 }
 
 impl ImageCacheFactoryImpl {
-    pub fn new(broken_image_icon_data: Vec<u8>) -> Self {
+    pub fn new(
+        broken_image_icon_data: Vec<u8>,
+        svg_font_provider: Arc<dyn SvgFontProvider>,
+    ) -> Self {
         debug!("Creating new ImageCacheFactoryImpl");
-        let mut fontdb = fontdb::Database::new();
-        fontdb.load_system_fonts();
-
         Self {
             broken_image_icon_data: Arc::new(broken_image_icon_data),
             thread_pool: ThreadPool::global(),
-            fontdb: Arc::new(fontdb),
+            svg_fonts: Arc::new(SvgFontDatabase::new(svg_font_provider)),
         }
     }
 }
@@ -837,7 +1023,7 @@ impl ImageCacheFactory for ImageCacheFactoryImpl {
             svg_id_image_id_map: Arc::new(Mutex::new(FxHashMap::default())),
             broken_image_icon_data: self.broken_image_icon_data.clone(),
             thread_pool: self.thread_pool.clone(),
-            fontdb: self.fontdb.clone(),
+            svg_fonts: self.svg_fonts.clone(),
         })
     }
 }
@@ -854,13 +1040,13 @@ pub struct ImageCacheImpl {
     thread_pool: Arc<ThreadPool>,
     /// A shared font database to be used by system fonts accessed when rasterizing vector
     /// images. This is shared with other [`ImageCache`]s in the same process.
-    fontdb: Arc<fontdb::Database>,
+    svg_fonts: Arc<SvgFontDatabase>,
 }
 
 impl ImageCache for ImageCacheImpl {
     fn memory_reports(&self, prefix: &str, ops: &mut MallocSizeOfOps) -> Vec<Report> {
         let store_size = self.store.lock().size_of(ops);
-        let fontdb_size = self.fontdb.conditional_size_of(ops);
+        let fontdb_size = self.svg_fonts.snapshot().conditional_size_of(ops);
         vec![
             Report {
                 path: path![prefix, "image-cache"],
@@ -1255,10 +1441,15 @@ impl ImageCache for ImageCacheImpl {
                         };
 
                         let local_store = self.store.clone();
-                        let fontdb = self.fontdb.clone();
+                        let svg_fonts = self.svg_fonts.clone();
                         self.thread_pool.spawn(move || {
-                            let msg =
-                                decode_bytes_sync(key, &bytes, cors_status, content_type, fontdb);
+                            let msg = decode_bytes_sync(
+                                key,
+                                &bytes,
+                                cors_status,
+                                content_type,
+                                &svg_fonts,
+                            );
                             local_store.lock().handle_decoder(msg);
                         });
                     },

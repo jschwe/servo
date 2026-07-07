@@ -9,7 +9,8 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use net::image_cache::ImageCacheFactoryImpl;
 use net_traits::image_cache::{
     ImageCache, ImageCacheFactory, ImageCacheResponseMessage, ImageCacheResult, ImageLoadListener,
-    ImageOrMetadataAvailable, ImageResponse, PendingImageId, PendingImageResponse,
+    ImageOrMetadataAvailable, ImageResponse, PendingImageId, PendingImageResponse, SvgFontData,
+    SvgFontProvider, SvgFontQuery,
 };
 use net_traits::request::RequestId;
 use net_traits::{
@@ -24,6 +25,23 @@ use webrender_api::ImageKey;
 
 use crate::mock_origin;
 
+struct NoSvgFontProvider;
+
+impl SvgFontProvider for NoSvgFontProvider {
+    fn select_font(&self, _query: &SvgFontQuery) -> Option<SvgFontData> {
+        None
+    }
+
+    fn select_fallback(
+        &self,
+        _character: char,
+        _exclude_keys: &[String],
+        _query: &SvgFontQuery,
+    ) -> Option<SvgFontData> {
+        None
+    }
+}
+
 fn create_test_image_cache() -> (Arc<dyn ImageCache>, Receiver<PipelineId>) {
     let (sender, receiver) = unbounded();
     let paint_api = CrossProcessPaintApi::dummy_with_callback(Some(Box::new(move |msg| {
@@ -32,7 +50,7 @@ fn create_test_image_cache() -> (Arc<dyn ImageCache>, Receiver<PipelineId>) {
         }
     })));
 
-    let factory = ImageCacheFactoryImpl::new(vec![]);
+    let factory = ImageCacheFactoryImpl::new(vec![], Arc::new(NoSvgFontProvider));
     let cache = factory.create(TEST_WEBVIEW_ID, TEST_PIPELINE_ID, &paint_api);
     (cache, receiver)
 }

@@ -11,6 +11,7 @@ mod glyph;
 #[expect(unsafe_code)]
 pub mod platform; // Public because integration tests need this
 mod shapers;
+mod svg_font_provider;
 mod system_font_service;
 
 pub(crate) use font::*;
@@ -31,6 +32,7 @@ pub use glyph::{GlyphInfo, ShapedText, ShapedTextSlice, ShapedTextSlicer};
 use icu_locid::subtags::Language;
 pub use platform::font_list::fallback_font_families;
 pub(crate) use shapers::*;
+pub use svg_font_provider::SvgFontProviderImpl;
 pub use system_font_service::SystemFontService;
 use unicode_properties::{EmojiStatus, UnicodeEmoji, emoji};
 

@@ -79,6 +79,10 @@ class BuildTarget(object):
     def needs_packaging(self) -> bool:
         return False
 
+    def is_remote(self) -> bool:
+        """True when "running" Servo happens on a remote device (Android / OpenHarmony)"""
+        return False
+
 
 class CrossBuildTarget(BuildTarget):
     def is_cross_build(self) -> bool:
@@ -285,6 +289,9 @@ class AndroidTarget(CrossBuildTarget):
         return True
 
     def needs_packaging(self) -> bool:
+        return True
+
+    def is_remote(self) -> bool:
         return True
 
     def get_package_path(self, build_type_directory: str) -> str:
@@ -505,6 +512,9 @@ class OpenHarmonyTarget(CrossBuildTarget):
         return "libservoshell.so"
 
     def needs_packaging(self) -> bool:
+        return True
+
+    def is_remote(self) -> bool:
         return True
 
     def get_package_path(self, build_type_directory: str, flavor: Optional[str] = None) -> str:

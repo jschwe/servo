@@ -56,6 +56,7 @@ BUILTIN_PRODUCTS = frozenset(
         "sauce",
         "servo",
         "servo_legacy",
+        "servo_ohos",
         "webkit",
         "webkitgtk_minibrowser",
         "wktr",

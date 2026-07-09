@@ -38,7 +38,7 @@ from mach.decorators import (
 import servo.devtools_tests
 import servo.try_parser
 from servo.command_base import BuildType, CommandBase, call, check_call
-from servo.platform.build_target import AndroidTarget, is_android, is_openharmony
+from servo.platform.build_target import AndroidTarget, OpenHarmonyTarget, is_android, is_openharmony
 from servo.post_build_commands import ANDROID_APP_NAME, PostBuildCommands, shell_quote
 from servo.util import delete
 
@@ -468,6 +468,12 @@ class MachCommands(CommandBase):
         action="store_true",
         help="Update test expectations after test run",
     )
+    @CommandArgument(
+        "--ohos",
+        default=False,
+        action="store_true",
+        help="Run the tests against Servo pre-installed on an OpenHarmony device (via ./mach install).",
+    )
     # Keep `allow_target_configuration` above `common_command_arguments`: binary_selection requires the
     # target to be configured already.
     @CommandBase.allow_target_configuration
@@ -482,11 +488,13 @@ class MachCommands(CommandBase):
             with tempfile.TemporaryDirectory() as temp_dir:
                 kwargs["log_raw"] = [os.path.join(temp_dir, "wpt.log")]
 
-        if self.target.is_cross_build():
-            print("test-wpt doesn't support any cross build targets (yet).")
+        if is_android(self.target):
+            print("test-wpt doesn't support android targets (yet).")
             return 1
         else:
-            assert servo_binary is not None, "servo_binary should only be none on Android / OpenHarmony"
+            assert servo_binary is not None or is_openharmony(self.target), (
+                "servo_binary should only be none on Android / OpenHarmony"
+            )
             test_return_value = self._test_wpt(servo_binary, multiprocess, **kwargs)
 
         # We should only update when the tests actually failed. In any other case
@@ -501,7 +509,7 @@ class MachCommands(CommandBase):
 
     @CommandBase.allow_target_configuration
     def _test_wpt(self, servo_binary: str, multiprocess: bool, **kwargs: Any) -> int:
-        return_value = wpt.run.run_tests(servo_binary, multiprocess, **kwargs)
+        return_value = wpt.run.run_tests(servo_binary, multiprocess, target=self.target, **kwargs)
         return return_value if not kwargs["always_succeed"] else 0
 
     @Command(

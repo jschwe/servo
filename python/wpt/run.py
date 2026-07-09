@@ -20,6 +20,8 @@ from collections.abc import Callable
 import mozlog
 import mozlog.formatters
 
+from servo.platform.build_target import BuildTarget, is_openharmony
+
 from . import SERVO_ROOT, WPT_PATH, WPT_TOOLS_PATH
 from .grouping_formatter import ServoFormatter, ServoHandler, UnexpectedResult, UnexpectedSubtestResult
 from wptrunner import wptcommandline
@@ -38,27 +40,47 @@ def set_if_none(args: dict, key: str, value: bool | int | str) -> None:
         args[key] = value
 
 
-def run_tests(default_binary_path: str, multiprocess: bool, **kwargs: Any) -> int:
-    print(f"Running WPT tests with {default_binary_path}")
+def run_tests(
+    default_binary_path: Optional[str], multiprocess: bool, target: Optional[BuildTarget] = None, **kwargs: Any
+) -> int:
+    remote = bool(target and target.is_remote())
+    ohos = bool(target and is_openharmony(target))
+
+    if remote:
+        print("Running WPT tests against Servo pre-installed on a remote device")
+    else:
+        print(f"Running WPT tests with {default_binary_path}")
 
     os.environ["RUST_BACKTRACE"] = "1"
-    os.environ["HOST_FILE"] = os.path.join(SERVO_ROOT, "tests", "wpt", "hosts")
+    if not remote:
+        os.environ["HOST_FILE"] = os.path.join(SERVO_ROOT, "tests", "wpt", "hosts")
 
     # The pytest framework used in the webdriver conformance tests dumps the
     # environment variables when unexpected results occur, and this variable
     # makes CI logs unreadable.
     github_context = os.environ.pop("GITHUB_CONTEXT", None)
 
-    # Allow to run with the legacy Servo WPT configuration. This is required
-    # until necessary improvements are made to the debugging experience with
-    # servodriver. See https://github.com/servo/servo/issues/40751
-    product = "servo_legacy" if kwargs.get("legacy") else "servo"
+    # Pick the wptrunner product:
+    #   - servo_ohos: drive Servo on an OpenHarmony device via hdc + WebDriver
+    #   - servo_legacy: legacy Servo WPT configuration (see #40751)
+    #   - servo: the default desktop Servo product
+    if ohos:
+        product = "servo_ohos"
+    elif kwargs.get("legacy"):
+        product = "servo_legacy"
+    else:
+        product = "servo"
 
     set_if_none(kwargs, "product", product)
     set_if_none(kwargs, "config", os.path.join(WPT_PATH, "config.ini"))
     set_if_none(kwargs, "include_manifest", os.path.join(WPT_PATH, "include.ini"))
     set_if_none(kwargs, "manifest_update", False)
-    set_if_none(kwargs, "processes", multiprocessing.cpu_count())
+    # Multiprocess concurrency is difficult on ohos / android, since the same app
+    # can't have multiple instances.
+    if remote:
+        set_if_none(kwargs, "processes", 1)
+    else:
+        set_if_none(kwargs, "processes", multiprocessing.cpu_count())
 
     set_if_none(kwargs, "ca_cert_path", os.path.join(CERTS_PATH, "cacert.pem"))
     set_if_none(kwargs, "host_key_path", os.path.join(CERTS_PATH, "web-platform.test.key"))
@@ -67,8 +89,17 @@ def run_tests(default_binary_path: str, multiprocess: bool, **kwargs: Any) -> in
     # chunks and leads to more consistent timing on GitHub Actions.
     set_if_none(kwargs, "chunk_type", "id_hash")
 
-    set_if_none(kwargs, "binary", default_binary_path)
-    set_if_none(kwargs, "webdriver_binary", default_binary_path)
+    if remote:
+        # A remote, on-device product never spawns a local binary; satisfy
+        # wptcommandline's check that *something* is given for `binary` /
+        # `webdriver_binary`, but the device browser (e.g. ServoOhosBrowser)
+        # ignores both.
+        set_if_none(kwargs, "binary", "/usr/bin/true")
+        set_if_none(kwargs, "webdriver_binary", "/usr/bin/true")
+        set_if_none(kwargs, "webdriver_port", 7000)
+    else:
+        set_if_none(kwargs, "binary", default_binary_path)
+        set_if_none(kwargs, "webdriver_binary", default_binary_path)
 
     if kwargs.pop("rr_chaos"):
         kwargs["debugger"] = "rr"
@@ -77,8 +108,10 @@ def run_tests(default_binary_path: str, multiprocess: bool, **kwargs: Any) -> in
         # TODO: Delete rr traces from green test runs?
 
     prefs = kwargs.pop("prefs")
-    if multiprocess:
+    if multiprocess and not remote:
         kwargs.setdefault("binary_args", ["-M"])
+    else:
+        kwargs.setdefault("binary_args", [])
 
     given_http_proxy_uri = False
     given_https_proxy_uri = False
@@ -99,6 +132,8 @@ def run_tests(default_binary_path: str, multiprocess: bool, **kwargs: Any) -> in
         test_types = {
             "servo": ["testharness", "reftest", "wdspec", "crashtest"],
             "servo_legacy": ["testharness", "reftest", "wdspec", "crashtest"],
+            # wdspec is deferred on OHOS.
+            "servo_ohos": ["testharness", "reftest", "crashtest"],
         }
         kwargs["test_types"] = test_types[product]
 
@@ -136,10 +171,11 @@ def run_tests(default_binary_path: str, multiprocess: bool, **kwargs: Any) -> in
     logger.add_handler(handler)
 
     with tempfile.TemporaryDirectory(prefix="servo-") as config_dir:
-        kwargs["binary_args"] += ["--config-dir", config_dir]
-        # Temporary workaround to avoid shared storage across parallel processes.
-        # Can be removed once per-process config dirs are supported.
-        kwargs["binary_args"] += ["--temporary-storage"]
+        if not remote:
+            kwargs["binary_args"] += ["--config-dir", config_dir]
+            # Temporary workaround to avoid shared storage across parallel processes.
+            # Can be removed once per-process config dirs are supported.
+            kwargs["binary_args"] += ["--temporary-storage"]
 
         wptrunner.run_tests(**kwargs)
 

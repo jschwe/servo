@@ -23,13 +23,21 @@ use url::Url;
 use crate::egl::host_trait::HostTrait;
 use crate::prefs::ServoShellPreferences;
 use crate::running_app_state::{RunningAppState, UserInterfaceCommand};
-use crate::window::{PlatformWindow, ServoShellWindow, ServoShellWindowId};
+use crate::window::{MIN_WINDOW_INNER_SIZE, PlatformWindow, ServoShellWindow, ServoShellWindowId};
 
 pub(crate) struct EmbeddedPlatformWindow {
     host: Rc<dyn HostTrait>,
     rendering_context: Rc<WindowRenderingContext>,
     refresh_driver: Rc<VsyncRefreshDriver>,
     viewport_rect: RefCell<Rect<i32, DevicePixel>>,
+    /// The size of the emulated window, which can be smaller than the native surface
+    /// when a resize was requested (e.g. via WebDriver). The [`WebView`] renders at
+    /// this size in the top-left corner of the surface.
+    inner_size: Cell<DeviceIntSize>,
+    /// Whether to honor resize requests by resizing the [`WebView`] within the
+    /// fixed-size native surface. Only enabled for WebDriver-driven instances;
+    /// otherwise web content could shrink the app's viewport via `window.resizeTo()`.
+    allow_resize_requests: bool,
     /// The HiDPI scaling factor to use for the display of [`WebView`]s.
     hidpi_scale_factor: Scale<f32, DeviceIndependentPixel, DevicePixel>,
     /// A list of showing [`InputMethod`] interfaces.
@@ -62,7 +70,7 @@ impl PlatformWindow for EmbeddedPlatformWindow {
         ScreenGeometry {
             size: viewport_rect.size,
             available_size: viewport_rect.size,
-            window_rect: viewport_rect.to_box2d(),
+            window_rect: Rect::new(viewport_rect.origin, self.inner_size.get()).to_box2d(),
         }
     }
 
@@ -163,8 +171,32 @@ impl PlatformWindow for EmbeddedPlatformWindow {
         window.repaint_webviews();
     }
 
-    fn request_resize(&self, _: &WebView, _: DeviceIntSize) -> Option<DeviceIntSize> {
-        None
+    fn request_resize(&self, webview: &WebView, new_size: DeviceIntSize) -> Option<DeviceIntSize> {
+        if !self.allow_resize_requests {
+            return None;
+        }
+
+        // The native surface cannot change size, so the emulated window is capped at
+        // the surface size: anything larger could not be rendered or read back for
+        // screenshots.
+        let surface_size = self.viewport_rect.borrow().size;
+        let clamped_size = new_size.clamp(MIN_WINDOW_INNER_SIZE, surface_size);
+        if clamped_size != new_size {
+            warn!(
+                "Clamped requested window size {new_size:?} to {clamped_size:?} \
+                 (surface size {surface_size:?})"
+            );
+        }
+        if self.inner_size.get() == clamped_size {
+            return Some(clamped_size);
+        }
+
+        self.inner_size.set(clamped_size);
+        webview.resize(PhysicalSize::new(
+            clamped_size.width as u32,
+            clamped_size.height as u32,
+        ));
+        Some(clamped_size)
     }
 
     fn rendering_context(&self) -> Rc<dyn RenderingContext> {
@@ -173,7 +205,7 @@ impl PlatformWindow for EmbeddedPlatformWindow {
 
     fn window_rect(&self) -> DeviceIndependentIntRect {
         convert_rect_to_css_pixel(
-            self.viewport_rect.borrow().to_box2d(),
+            Rect::new(self.viewport_rect.borrow().origin, self.inner_size.get()).to_box2d(),
             self.hidpi_scale_factor(),
         )
     }
@@ -357,12 +389,19 @@ impl App {
             .expect("Could not create RenderingContext"),
         );
         let id = window_id.unwrap_or(ServoShellWindowId::next());
+        let preferences = self.servoshell_preferences();
+        let hidpi_scale_factor = preferences
+            .device_pixel_ratio_override
+            .map(Scale::new)
+            .unwrap_or(hidpi_scale_factor);
         let platform_window = Rc::new(EmbeddedPlatformWindow {
             id,
             host: self.host.clone(),
             rendering_context,
             refresh_driver,
             viewport_rect: RefCell::new(viewport_rect),
+            inner_size: Cell::new(viewport_size),
+            allow_resize_requests: preferences.webdriver_port.get().is_some(),
             hidpi_scale_factor,
             visible_input_methods: Default::default(),
             current_title: Default::default(),
@@ -465,6 +504,7 @@ impl App {
         let window = self.window().platform_window();
         let embedded_platform_window = window.as_headed_window().expect("No headed window");
         *embedded_platform_window.viewport_rect.borrow_mut() = viewport_rect;
+        embedded_platform_window.inner_size.set(viewport_rect.size);
 
         self.spin_event_loop();
     }

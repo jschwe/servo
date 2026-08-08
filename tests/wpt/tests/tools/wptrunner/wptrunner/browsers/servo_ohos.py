@@ -43,8 +43,6 @@ __wptrunner__ = {
     "update_properties": "update_properties",
 }
 
-# OHOS bundle and ability defaults. The bundle is overridable via the shared
-# wptrunner `--package-name` flag; the ability name is fixed.
 DEFAULT_PACKAGE = "org.servo.servo"
 DEFAULT_ABILITY = "EntryAbility"
 # Name of the HAP module inside the Servo bundle. Hard-coded here because it

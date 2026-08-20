@@ -2301,9 +2301,6 @@ async fn http_network_fetch(
         return Response::network_error(NetworkError::LoadCancelled);
     }
 
-    *res_body.lock() = ResponseBody::Receiving(vec![]);
-    let res_body2 = res_body.clone();
-
     if let Some(ref sender) = devtools_sender &&
         let Some(m) = msg
     {
@@ -2329,8 +2326,15 @@ async fn http_network_fetch(
         .and_then(|s| s.parse().ok())
         .map(|length| min(length, pref!(network_max_content_length) as usize))
     {
+        *res_body.lock() = ResponseBody::Receiving(Vec::with_capacity(possible_length));
         let _ = done_sender.send(Data::ContentLength(possible_length));
+    } else {
+        // If we don't know the content length, it still makes sense to pre-allocate
+        // something to reduce realloc churn.
+        *res_body.lock() = ResponseBody::Receiving(Vec::with_capacity(4096));
     }
+
+    let res_body2 = res_body.clone();
 
     spawn_task(
         res.into_body()
@@ -2357,12 +2361,15 @@ async fn http_network_fetch(
                     ResponseBody::Receiving(ref mut body) => std::mem::take(body),
                     _ => vec![],
                 };
-                let devtools_response_body = completed_body.clone();
+                // If devtools is disabled avoid cloning, since the result would
+                // be unused anyway.
+                let devtools_response_body =
+                    devtools_chan.is_some().then(|| completed_body.clone());
                 *body = ResponseBody::Done(completed_body);
                 send_response_values_to_devtools(
                     Some(headers),
                     status,
-                    Some(devtools_response_body),
+                    devtools_response_body,
                     CacheState::None,
                     &devtools_request,
                     devtools_chan,

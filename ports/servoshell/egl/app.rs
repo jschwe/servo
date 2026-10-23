@@ -639,6 +639,10 @@ impl App {
             Key::Named(NamedKey::Process),
         )));
         webview.notify_input_event(InputEvent::Ime(ImeEvent::Composition(CompositionEvent {
+            state: CompositionState::Update,
+            data: text.clone(),
+        })));
+        webview.notify_input_event(InputEvent::Ime(ImeEvent::Composition(CompositionEvent {
             state: CompositionState::End,
             data: text,
         })));

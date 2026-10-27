@@ -475,9 +475,9 @@ codegen-units = 1
 #
 # For WebRender:
 #
-# webrender = { path = "../webrender/webrender" }
-# webrender_api = { path = "../webrender/webrender_api" }
-# wr_malloc_size_of = { path = "../webrender/wr_malloc_size_of" }
+ webrender = { git = "https://github.com/jschwe/webrender", branch = "emoji_scaling_fix" }
+ webrender_api = { git = "https://github.com/jschwe/webrender", branch = "emoji_scaling_fix" }
+ wr_malloc_size_of = { git = "https://github.com/jschwe/webrender", branch = "emoji_scaling_fix" }
 #
 # Or for mozjs:
 #

@@ -6625,8 +6625,7 @@ dependencies = [
 [[package]]
 name = "peek-poke"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef60922033e31835f6cf98b9b81b58368037b71d2a81928985cd9d0b3b3171fb"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "euclid",
  "peek-poke-derive",
@@ -6635,8 +6634,7 @@ dependencies = [
 [[package]]
 name = "peek-poke-derive"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271f78bae1e699b58c180a384a2e8d78ccbb60b853e15db92339725f3a2764d5"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -12018,8 +12016,7 @@ dependencies = [
 [[package]]
 name = "webrender"
 version = "0.70.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ede9dbc3cfb3e2c073a68e20f8fd54d9f6be8587be1c7c948e1ac51112421ef6"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "allocator-api2",
  "bincode",
@@ -12054,8 +12051,7 @@ dependencies = [
 [[package]]
 name = "webrender_api"
 version = "0.70.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11fa15766536df782680147d2ed7a2d2cebd2dc9f0f48e89c56ca39f11259d76"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "app_units",
  "bitflags 2.13.2",
@@ -12074,8 +12070,7 @@ dependencies = [
 [[package]]
 name = "webrender_build"
 version = "0.70.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "674538885dba825ee1ddda72ade941fef81364cb843bbb0452fe7d134068ed89"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "bitflags 2.13.2",
  "lazy_static",
@@ -12693,8 +12688,7 @@ dependencies = [
 [[package]]
 name = "wr_glyph_rasterizer"
 version = "0.70.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcda26d8788ba57a04cd75ae4a2c6da3aa8e5ab16ed1cfd5db09d0fbc04df2fb"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "core-foundation 0.9.4",
  "core-graphics",
@@ -12718,8 +12712,7 @@ dependencies = [
 [[package]]
 name = "wr_malloc_size_of"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "482308b684f11723b200a32808094bb460b5ac4840903ccbcb78ad92a6354a1f"
+source = "git+https://github.com/jschwe/webrender?branch=emoji_scaling_fix#2f26f1c7e6db535c02f92278aa01c43305d9bf24"
 dependencies = [
  "app_units",
  "euclid",
